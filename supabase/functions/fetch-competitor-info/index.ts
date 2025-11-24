@@ -14,6 +14,17 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Check for required environment variables first
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GEMINI_API_KEY) {
+      console.error("Server configuration error: Missing one or more required environment variables (URL, Service Key, or Gemini Key).");
+      throw new Error("Server configuration error: Missing required secrets.");
+    }
+
+    // 2. Get request body
     const { competitor_id, competitor_name } = await req.json();
     if (!competitor_id || !competitor_name) {
       return new Response(JSON.stringify({ error: "competitor_id and competitor_name are required." }), {
@@ -22,24 +33,18 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not set.");
-      throw new Error("Server configuration error: Missing API key.");
-    }
-
+    // 3. Initialize clients
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+    // 4. Generate content with a more robust prompt
     const prompt = `
-You are a business analyst with extensive knowledge of the tech industry. Based on your knowledge of the fintech company named "${competitor_name}", generate the following:
+You are a business analyst with extensive knowledge of the tech industry. Based on your existing knowledge of the fintech company named "${competitor_name}", generate the following:
 1.  A short_description: A concise, one-sentence summary of the company's primary function.
 2.  A long_description: A detailed paragraph (3-5 sentences) describing the company, its key products, and its target audience. If you know their official website or other relevant public links, incorporate them into the description using markdown format, for example: [Official Website](https://example.com).
+
+If you do not have specific knowledge of "${competitor_name}", state that clearly in the descriptions.
 
 Provide the output in a single, valid JSON object with the following structure. Do not include any other text or markdown formatting.
 {
@@ -56,14 +61,14 @@ Provide the output in a single, valid JSON object with the following structure. 
     try {
       aiResult = JSON.parse(jsonText);
       if (!aiResult.short_description || !aiResult.long_description) {
-        throw new Error("AI response is missing required description fields.");
+        throw new Error("AI response was missing the required description fields.");
       }
     } catch (e) {
-      console.error("Failed to parse JSON from AI response:", jsonText);
-      console.error("Original error:", e.message);
+      console.error("Failed to parse JSON from AI response:", jsonText, e.message);
       throw new Error("AI returned an invalid response format. Please try again.");
     }
 
+    // 5. Update database
     const { error: updateError } = await supabase
       .from('competitors')
       .update({
@@ -84,7 +89,8 @@ Provide the output in a single, valid JSON object with the following structure. 
 
   } catch (error) {
     console.error("Error in fetch-competitor-info function:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Return a more descriptive error to the client
+    return new Response(JSON.stringify({ error: `Function failed: ${error.message}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
