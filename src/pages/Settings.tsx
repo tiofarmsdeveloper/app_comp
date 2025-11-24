@@ -39,7 +39,11 @@ const Settings = () => {
         .eq("key", "gemini_model")
         .single();
 
-      if (data?.value) {
+      // PGRST116 means no rows found, which is not an error in this case.
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching current model:", error);
+        showError(error.message);
+      } else if (data?.value) {
         setCurrentModel(data.value);
         setSelectedModel(data.value);
       }
@@ -60,6 +64,7 @@ const Settings = () => {
       setModels(data.models || []);
       showSuccess("Successfully fetched models.");
     } catch (err) {
+      console.error("Failed to fetch models:", err);
       showError(err instanceof Error ? err.message : "Failed to fetch models.");
     } finally {
       dismissToast(toastId);
@@ -84,6 +89,7 @@ const Settings = () => {
       setCurrentModel(selectedModel);
       showSuccess("Settings saved successfully!");
     } catch (err) {
+      console.error("Failed to save settings:", err);
       showError(err instanceof Error ? err.message : "Failed to save settings.");
     } finally {
       dismissToast(toastId);
