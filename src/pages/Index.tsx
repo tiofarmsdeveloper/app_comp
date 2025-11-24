@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
 import { MadeWithDyad } from "@/components/made-with-dyad";
@@ -13,7 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/components/AnalysisResult";
 import { ComparisonResult } from "@/components/ComparisonResult";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 
 const competitors = [
   { name: "Revolut", path: "/competitors/revolut.png" },
@@ -136,6 +137,13 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
+      <div className="absolute top-4 right-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/settings">
+            <Settings className="h-5 w-5" />
+          </Link>
+        </Button>
+      </div>
       <div className="w-full max-w-2xl text-center">
         <h1 className="text-4xl font-bold mb-2 tracking-tight">
           Sinder Competitor Analysis Tool

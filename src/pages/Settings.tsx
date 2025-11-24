@@ -1,0 +1,158 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
+import { Loader2, ArrowLeft } from "lucide-react";
+
+const Settings = () => {
+  const [models, setModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    const fetchCurrentModel = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "gemini_model")
+        .single();
+
+      if (data?.value) {
+        setCurrentModel(data.value);
+        setSelectedModel(data.value);
+      }
+      setIsLoading(false);
+    };
+
+    fetchCurrentModel();
+  }, []);
+
+  const handleFetchModels = async () => {
+    setIsFetching(true);
+    const toastId = showLoading("Fetching available models...");
+    try {
+      const { data, error } = await supabase.functions.invoke("list-models");
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
+      
+      setModels(data.models || []);
+      showSuccess("Successfully fetched models.");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to fetch models.");
+    } finally {
+      dismissToast(toastId);
+      setIsFetching(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedModel) {
+      showError("Please select a model first.");
+      return;
+    }
+    setIsLoading(true);
+    const toastId = showLoading("Saving settings...");
+    try {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key: "gemini_model", value: selectedModel });
+
+      if (error) throw error;
+
+      setCurrentModel(selectedModel);
+      showSuccess("Settings saved successfully!");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to save settings.");
+    } finally {
+      dismissToast(toastId);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex items-center mb-4">
+            <Button variant="ghost" size="icon" className="mr-2" asChild>
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="flex-grow">
+              <CardTitle>Settings</CardTitle>
+              <CardDescription>
+                Configure the AI model for analysis.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Current Model</Label>
+            <p className="text-sm text-muted-foreground h-6">
+              {isLoading ? "Loading..." : currentModel || "Not set"}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="model-select">Gemini AI Model</Label>
+            <div className="flex gap-2">
+              <Select
+                onValueChange={setSelectedModel}
+                value={selectedModel || ""}
+                disabled={models.length === 0}
+              >
+                <SelectTrigger id="model-select">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleFetchModels} variant="outline" disabled={isFetching}>
+                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Click 'Fetch' to get a list of compatible models from your Google AI account.
+            </p>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSave} disabled={isLoading || !selectedModel} className="w-full">
+            {isLoading && !isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save Settings
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
+
+export default Settings;
