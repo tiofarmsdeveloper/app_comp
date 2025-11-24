@@ -43,7 +43,7 @@ serve(async (req) => {
 
     // 3. Initialize the Google Generative AI client
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
 
     // 4. Prepare the prompt and image for the API
     const prompt = "Analyze this fintech app screenshot. Extract: UI elements, visual hierarchy, color palette, information density, call-to-actions, trust signals, and user flow. Format as structured text.";

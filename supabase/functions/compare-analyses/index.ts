@@ -28,7 +28,7 @@ serve(async (req) => {
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
 
     const competitorAnalysesText = competitorAnalyses.map((analysis, index) => `
 --- COMPETITOR ${index + 1} ANALYSIS ---
