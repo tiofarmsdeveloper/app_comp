@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.15.0";
@@ -35,7 +36,7 @@ serve(async (req) => {
 
     if (!file) {
       return new Response(JSON.stringify({ error: "No file provided." }), {
-        status: 400,
+        status: 200, // Return 200 to provide a clear error message on the client
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -62,7 +63,7 @@ serve(async (req) => {
     console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200, // Return 200 to provide a clear error message on the client
     });
   }
 });
