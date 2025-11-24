@@ -12,18 +12,46 @@ import {
 } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/components/AnalysisResult";
+import { ComparisonResult } from "@/components/ComparisonResult";
 import { Loader2 } from "lucide-react";
+
+const competitors = [
+  { name: "Revolut", path: "/competitors/revolut.png" },
+  { name: "Wise", path: "/competitors/wise.png" },
+  { name: "N26", path: "/competitors/n26.png" },
+  { name: "Monzo", path: "/competitors/monzo.png" },
+  { name: "Curve", path: "/competitors/curve.png" },
+];
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<string | null>(null);
 
   const handleFileChange = (file: File | null) => {
     setUploadedFile(file);
-    if (analysisResult) {
-      setAnalysisResult(null);
+    if (userAnalysis || comparisonResult) {
+      setUserAnalysis(null);
+      setComparisonResult(null);
     }
+  };
+
+  const analyzeImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const { data, error } = await supabase.functions.invoke("analyze-image", {
+      body: formData,
+    });
+
+    if (error)
+      throw new Error(`Analysis failed for ${file.name}: ${error.message}`);
+    if (data.error)
+      throw new Error(`Analysis failed for ${file.name}: ${data.error}`);
+
+    return data.analysis;
   };
 
   const handleAnalyze = async () => {
@@ -33,33 +61,53 @@ const Index = () => {
     }
 
     setIsLoading(true);
-    const toastId = showLoading(`Analyzing ${uploadedFile.name}...`);
+    const toastId = showLoading("Starting analysis...");
 
     try {
-      const formData = new FormData();
-      formData.append("file", uploadedFile);
+      setLoadingMessage(`Analyzing your screenshot...`);
+      const userAnalysisPromise = analyzeImage(uploadedFile);
 
-      const { data, error } = await supabase.functions.invoke("analyze-image", {
-        body: formData,
+      setLoadingMessage(`Analyzing competitors...`);
+      const competitorPromises = competitors.map(async (competitor) => {
+        const response = await fetch(competitor.path);
+        if (!response.ok)
+          throw new Error(`Failed to fetch ${competitor.name} screenshot.`);
+        const blob = await response.blob();
+        const fileName = competitor.path.split("/").pop()!;
+        const file = new File([blob], fileName, { type: blob.type });
+        return analyzeImage(file);
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      const [userResult, ...competitorResults] = await Promise.all([
+        userAnalysisPromise,
+        ...competitorPromises,
+      ]);
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      setUserAnalysis(userResult);
+      showSuccess("Initial analyses complete. Now comparing...");
+      setLoadingMessage("Comparing against competitors...");
 
-      setAnalysisResult(data.analysis);
-      showSuccess("Analysis complete!");
+      const { data: comparisonData, error: comparisonError } =
+        await supabase.functions.invoke("compare-analyses", {
+          body: {
+            userAnalysis: userResult,
+            competitorAnalyses: competitorResults,
+          },
+        });
+
+      if (comparisonError) throw new Error(comparisonError.message);
+      if (comparisonData.error) throw new Error(comparisonData.error);
+
+      setComparisonResult(comparisonData.comparison);
+      showSuccess("Comparison complete!");
     } catch (err) {
-      console.error("Analysis failed:", err);
+      console.error("Full analysis process failed:", err);
       showError(
         err instanceof Error ? err.message : "An unknown error occurred.",
       );
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
       if (toastId) {
         dismissToast(toastId);
       }
@@ -68,17 +116,17 @@ const Index = () => {
 
   const handleClear = () => {
     setUploadedFile(null);
-    setAnalysisResult(null);
-    // We need to reset the file input in the FileUpload component as well.
-    // A simple way is to re-render the component by changing a key, but for now,
-    // we will just clear the state here. The FileUpload component itself doesn't
-    // expose a reset method, so this will do.
+    setUserAnalysis(null);
+    setComparisonResult(null);
   };
 
-  if (analysisResult) {
+  if (userAnalysis) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-        <AnalysisResult result={analysisResult} onClear={handleClear} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 py-12">
+        <div className="w-full max-w-2xl">
+          <AnalysisResult result={userAnalysis} onClear={handleClear} />
+          {comparisonResult && <ComparisonResult result={comparisonResult} />}
+        </div>
         <div className="absolute bottom-0">
           <MadeWithDyad />
         </div>
@@ -107,7 +155,7 @@ const Index = () => {
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Analyzing...
+                {loadingMessage || "Analyzing..."}
               </>
             ) : (
               "Analyze Against Competitors"
