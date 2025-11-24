@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,10 @@ import { AnalysisResult } from "@/components/AnalysisResult";
 import { ComparisonResult } from "@/components/ComparisonResult";
 import { Loader2, Settings, History } from "lucide-react";
 
-const competitors = [
-  { name: "Revolut", path: "/competitors/revolut.png" },
-  { name: "Wise", path: "/competitors/wise.png" },
-  { name: "N26", path: "/competitors/n26.png" },
-  { name: "Monzo", path: "/competitors/monzo.png" },
-  { name: "Curve", path: "/competitors/curve.png" },
-];
+interface Competitor {
+  name: string;
+  imageUrl: string;
+}
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -29,6 +26,26 @@ const Index = () => {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
   const [comparisonResult, setComparisonResult] = useState<string | null>(null);
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+
+  useEffect(() => {
+    const fetchCompetitors = async () => {
+      const { data, error } = await supabase
+        .from("competitors")
+        .select("name, image_path");
+
+      if (error) {
+        console.error("Failed to fetch competitors for analysis", error);
+      } else {
+        const competitorsWithUrls = data.map(c => {
+          const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(c.image_path);
+          return { name: c.name, imageUrl: publicUrl };
+        });
+        setCompetitors(competitorsWithUrls);
+      }
+    };
+    fetchCompetitors();
+  }, []);
 
   const handleFileChange = (file: File | null) => {
     setUploadedFile(file);
@@ -38,7 +55,7 @@ const Index = () => {
     }
   };
 
-  const analyzeImage = async (file: File): Promise<string> => {
+  const analyzeImage = async (file: File, fileName: string): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -47,9 +64,9 @@ const Index = () => {
     });
 
     if (error)
-      throw new Error(`Analysis failed for ${file.name}: ${error.message}`);
+      throw new Error(`Analysis failed for ${fileName}: ${error.message}`);
     if (data.error)
-      throw new Error(`Analysis failed for ${file.name}: ${data.error}`);
+      throw new Error(`Analysis failed for ${fileName}: ${data.error}`);
 
     return data.analysis;
   };
@@ -59,6 +76,10 @@ const Index = () => {
       showError("Please upload a screenshot first.");
       return;
     }
+    if (competitors.length === 0) {
+      showError("Please add at least one competitor in the settings before analyzing.");
+      return;
+    }
 
     setIsLoading(true);
     const toastId = showLoading("Starting analysis...");
@@ -66,17 +87,16 @@ const Index = () => {
     try {
       // Step 1: Analyze user and competitor images
       setLoadingMessage(`Analyzing your screenshot...`);
-      const userAnalysisPromise = analyzeImage(uploadedFile);
+      const userAnalysisPromise = analyzeImage(uploadedFile, uploadedFile.name);
 
-      setLoadingMessage(`Analyzing competitors...`);
+      setLoadingMessage(`Analyzing ${competitors.length} competitors...`);
       const competitorPromises = competitors.map(async (competitor) => {
-        const response = await fetch(competitor.path);
+        const response = await fetch(competitor.imageUrl);
         if (!response.ok)
           throw new Error(`Failed to fetch ${competitor.name} screenshot.`);
         const blob = await response.blob();
-        const fileName = competitor.path.split("/").pop()!;
-        const file = new File([blob], fileName, { type: blob.type });
-        return analyzeImage(file);
+        const file = new File([blob], competitor.name, { type: blob.type });
+        return analyzeImage(file, competitor.name);
       });
 
       const [userResult, ...competitorResults] = await Promise.all([
