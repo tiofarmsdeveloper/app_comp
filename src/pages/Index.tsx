@@ -92,7 +92,10 @@ const Index = () => {
         await supabase.functions.invoke("compare-analyses", {
           body: {
             userAnalysis: userResult,
-            competitorAnalyses: competitorResults,
+            competitorAnalyses: competitorResults.map((analysis, index) => ({
+              name: competitors[index].name,
+              analysis: analysis,
+            })),
           },
         });
 

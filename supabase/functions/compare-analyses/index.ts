@@ -45,10 +45,12 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const competitorAnalysesText = competitorAnalyses.map((analysis, index) => `
---- COMPETITOR ${index + 1} ANALYSIS ---
-${analysis}
+    const competitorAnalysesText = competitorAnalyses.map((comp, index) => `
+--- COMPETITOR ${index + 1}: ${comp.name} ---
+${comp.analysis}
     `).join('\n');
+    
+    const competitorNames = competitorAnalyses.map(c => c.name).join(', ');
 
     const prompt = `
 You are a UX and product strategy expert.
@@ -58,12 +60,12 @@ ${userAnalysis}
 Now, here are the analyses of several competitor apps:
 ${competitorAnalysesText}
 --- TASK ---
-Based on all the provided analyses, compare the user's app against the competitors.
-Structure your response into three sections:
+Based on all the provided analyses, compare the user's app against the competitors (${competitorNames}).
+Structure your response into three sections using markdown for formatting:
 1.  **What the user's app does better:** Identify 2-3 key strengths.
-2.  **What competitors do better:** Identify 2-3 key areas where competitors excel.
+2.  **What competitors do better:** Identify 2-3 key areas where competitors excel. Refer to specific competitors by name.
 3.  **5 Actionable Recommendations:** Provide five specific, concrete recommendations for the user's app to improve its competitive positioning. These should be actionable and clear.
-Format the output as clean, structured text.
+Format the output as clean, structured markdown. Do not include a preamble or introduction.
 `;
 
     const result = await model.generateContent(prompt);
@@ -71,7 +73,7 @@ Format the output as clean, structured text.
     const comparisonText = response.text();
 
     return new Response(JSON.stringify({ comparison: comparisonText }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-type": "application/json" },
       status: 200,
     });
 

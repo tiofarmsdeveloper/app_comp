@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import ReactMarkdown from "react-markdown";
 
 interface ComparisonResultProps {
   result: string;
@@ -21,9 +22,7 @@ export const ComparisonResult = ({ result }: ComparisonResultProps) => {
       </CardHeader>
       <CardContent>
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <pre className="whitespace-pre-wrap font-sans text-sm">
-            {result}
-          </pre>
+          <ReactMarkdown>{result}</ReactMarkdown>
         </div>
       </CardContent>
     </Card>
