@@ -27,19 +27,24 @@ serve(async (req) => {
       .single();
 
     if (modelError && modelError.code !== 'PGRST116') {
+      console.error("Supabase error fetching model:", modelError);
       throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
     }
     
-    const modelName = modelSetting?.value || 'gemini-pro';
+    const modelName = modelSetting?.value || 'gemini-1.5-flash';
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables.");
+      console.error("GEMINI_API_KEY is not set.");
+      throw new Error("Server configuration error: Missing API key.");
     }
 
     const { userAnalysis, competitorAnalyses } = await req.json();
     if (!userAnalysis || !competitorAnalyses) {
-      throw new Error("Invalid input: userAnalysis and competitorAnalyses are required.");
+      return new Response(JSON.stringify({ error: "Invalid input: userAnalysis and competitorAnalyses are required." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -85,10 +90,10 @@ Format the output as clean, structured markdown. Do not include a preamble or in
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error in compare-analyses function:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 500,
     });
   }
 });

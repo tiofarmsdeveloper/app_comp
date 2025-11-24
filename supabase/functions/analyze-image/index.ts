@@ -36,20 +36,25 @@ serve(async (req) => {
       .single();
 
     if (modelError && modelError.code !== 'PGRST116') { // Ignore 'not found' error
+      console.error("Supabase error fetching model:", modelError);
       throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
     }
     
-    const modelName = modelSetting?.value || 'gemini-pro'; // Fallback to gemini-pro
+    const modelName = modelSetting?.value || 'gemini-1.5-flash'; // Fallback to a known good model
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables.");
+      console.error("GEMINI_API_KEY is not set.");
+      throw new Error("Server configuration error: Missing API key.");
     }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {
-      throw new Error("No file provided.");
+      return new Response(JSON.stringify({ error: "No file provided." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -67,10 +72,10 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error in analyze-image function:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 500,
     });
   }
 });

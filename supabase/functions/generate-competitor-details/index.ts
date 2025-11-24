@@ -29,7 +29,10 @@ serve(async (req) => {
   try {
     const { competitor_id, screenshot_ids } = await req.json();
     if (!competitor_id || !screenshot_ids || screenshot_ids.length === 0) {
-      throw new Error("competitor_id and at least one screenshot_id are required.");
+      return new Response(JSON.stringify({ error: "competitor_id and at least one screenshot_id are required." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     const supabase = createClient(
@@ -37,7 +40,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', // Use service role key for admin access
     );
 
-    // Fetch screenshot paths from DB
     const { data: screenshots, error: ssError } = await supabase
       .from('competitor_screenshots')
       .select('id, image_path')
@@ -51,16 +53,18 @@ serve(async (req) => {
     const imageParts = await Promise.all(
       screenshots.map(ss => {
         const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(ss.image_path);
-        // Assuming PNG, adjust if other types are used. A more robust solution would store mime type.
         return urlToGenerativePart(publicUrl, 'image/png');
       })
     );
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set.");
+    if (!GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY is not set.");
+      throw new Error("Server configuration error: Missing API key.");
+    }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Use latest vision model
 
     const prompt = `
 You are a UX and Product Analyst. Based on the following screenshots from a single fintech app, perform these two tasks:
@@ -84,11 +88,15 @@ Provide the output in a single, valid JSON object with the following structure. 
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const jsonText = response.text().replace(/```json|```/g, '').trim();
-    const aiResult = JSON.parse(jsonText);
-
-    // --- Update database with AI results ---
     
-    // 1. Update competitor descriptions
+    let aiResult;
+    try {
+      aiResult = JSON.parse(jsonText);
+    } catch (e) {
+      console.error("Failed to parse JSON from AI response:", jsonText);
+      throw new Error("AI returned an invalid response format.");
+    }
+
     const { error: updateCompError } = await supabase
       .from('competitors')
       .update({
@@ -98,7 +106,6 @@ Provide the output in a single, valid JSON object with the following structure. 
       .eq('id', competitor_id);
     if (updateCompError) throw updateCompError;
 
-    // 2. Update screenshot titles
     const updatePromises = screenshots.map((ss, index) =>
       supabase
         .from('competitor_screenshots')
@@ -117,7 +124,7 @@ Provide the output in a single, valid JSON object with the following structure. 
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error in generate-competitor-details function:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
