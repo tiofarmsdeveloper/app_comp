@@ -64,23 +64,13 @@ serve(async (req) => {
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Use latest vision model
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const prompt = `
-You are a UX and Product Analyst. Based on the following screenshots from a single fintech app, perform these two tasks:
-
-TASK 1: APP DESCRIPTION
-Analyze all screenshots holistically and generate:
-a) A short_description: A one-sentence summary of the app's primary function.
-b) A long_description: A detailed paragraph (3-5 sentences) describing the app's key features, user interface, and target audience as inferred from the screenshots.
-
-TASK 2: SCREENSHOT TITLES
-For each of the ${screenshots.length} screenshots provided, generate a concise, descriptive title (3-5 words) that identifies the main action or information shown. The order of titles must correspond to the order of the images provided.
+You are a UX Analyst. For each of the ${screenshots.length} fintech app screenshots provided, generate a concise, descriptive title (3-5 words) that identifies the main action or information shown. The order of titles must correspond to the order of the images provided.
 
 Provide the output in a single, valid JSON object with the following structure. Do not include any other text or markdown formatting.
 {
-  "short_description": "...",
-  "long_description": "...",
   "screenshot_titles": ["title for image 1", "title for image 2", ...]
 }
 `;
@@ -92,19 +82,13 @@ Provide the output in a single, valid JSON object with the following structure. 
     let aiResult;
     try {
       aiResult = JSON.parse(jsonText);
+       if (!aiResult.screenshot_titles || aiResult.screenshot_titles.length !== screenshots.length) {
+        throw new Error("AI response is missing titles or has incorrect number of titles.");
+      }
     } catch (e) {
-      console.error("Failed to parse JSON from AI response:", jsonText);
+      console.error("Failed to parse JSON from AI response:", jsonText, e.message);
       throw new Error("AI returned an invalid response format.");
     }
-
-    const { error: updateCompError } = await supabase
-      .from('competitors')
-      .update({
-        short_description: aiResult.short_description,
-        long_description: aiResult.long_description,
-      })
-      .eq('id', competitor_id);
-    if (updateCompError) throw updateCompError;
 
     const updatePromises = screenshots.map((ss, index) =>
       supabase

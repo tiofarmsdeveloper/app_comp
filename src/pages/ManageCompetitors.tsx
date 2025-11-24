@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   showSuccess,
@@ -31,11 +30,11 @@ import {
   ArrowLeft,
   Trash2,
   PlusCircle,
-  Image as ImageIcon,
   Youtube,
   Sparkles,
   Loader2,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Screenshot {
   id: string;
@@ -72,7 +71,7 @@ const ManageCompetitors = () => {
     } else {
       const competitorsWithDetails = await Promise.all(
         competitorsData.map(async (c) => {
-          const { data: screenshotsData, error: ssError } = await supabase
+          const { data: screenshotsData } = await supabase
             .from("competitor_screenshots")
             .select("id, image_path, ai_title")
             .eq("competitor_id", c.id)
@@ -122,7 +121,6 @@ const ManageCompetitors = () => {
     if (!window.confirm("Are you sure you want to delete this competitor and all its data?")) return;
     const toastId = showLoading("Deleting competitor...");
     try {
-      // Storage deletion needs to happen first
       const { data: screenshots } = await supabase.from('competitor_screenshots').select('image_path').eq('competitor_id', competitorId);
       if (screenshots && screenshots.length > 0) {
         const paths = screenshots.map(s => s.image_path);
@@ -215,8 +213,27 @@ interface CompetitorAccordionItemProps {
 const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorAccordionItemProps) => {
   const [newFiles, setNewFiles] = useState<FileList | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
+  const [isFetchingInfo, setIsFetchingInfo] = useState(false);
   const [newVideoUrl, setNewVideoUrl] = useState("");
+
+  const handleFetchInfo = async () => {
+    setIsFetchingInfo(true);
+    const toastId = showLoading(`Researching ${competitor.name}...`);
+    try {
+      const { error } = await supabase.functions.invoke("fetch-competitor-info", {
+        body: { competitor_id: competitor.id, competitor_name: competitor.name },
+      });
+      if (error) throw error;
+      showSuccess("Successfully fetched competitor info.");
+      onUpdate();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to fetch info.");
+    } finally {
+      dismissToast(toastId);
+      setIsFetchingInfo(false);
+    }
+  };
 
   const handleUploadScreenshots = async () => {
     if (!newFiles || newFiles.length === 0) {
@@ -242,9 +259,8 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
         if (insertError) throw insertError;
       }
       
-      const failedCount = results.length - successfulUploads.length;
-      if (failedCount > 0) {
-        showError(`${failedCount} uploads failed.`);
+      if (results.length - successfulUploads.length > 0) {
+        showError(`${results.length - successfulUploads.length} uploads failed.`);
       } else {
         showSuccess("Screenshots uploaded.");
       }
@@ -260,14 +276,14 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
     }
   };
 
-  const handleGenerateDetails = async () => {
+  const handleGenerateTitles = async () => {
     const screenshotsToProcess = competitor.screenshots.filter(s => !s.ai_title);
     if (screenshotsToProcess.length === 0) {
       showError("No new screenshots to analyze.");
       return;
     }
-    setIsGenerating(true);
-    const toastId = showLoading("Generating AI details...");
+    setIsGeneratingTitles(true);
+    const toastId = showLoading("Generating screenshot titles...");
     try {
       const screenshot_ids = screenshotsToProcess.map(s => s.id);
       const { data, error } = await supabase.functions.invoke("generate-competitor-details", {
@@ -275,24 +291,22 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
-      showSuccess("AI details generated successfully.");
+      showSuccess("Screenshot titles generated successfully.");
       onUpdate();
     } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to generate details.");
+      showError(err instanceof Error ? err.message : "Failed to generate titles.");
     } finally {
       dismissToast(toastId);
-      setIsGenerating(false);
+      setIsGeneratingTitles(false);
     }
   };
 
   const handleAddVideo = async () => {
     if (!newVideoUrl.trim()) return;
-    const currentVideos = competitor.youtube_videos || [];
-    const updatedVideos = [...currentVideos, newVideoUrl];
+    const updatedVideos = [...(competitor.youtube_videos || []), newVideoUrl];
     const { error } = await supabase.from('competitors').update({ youtube_videos: updatedVideos }).eq('id', competitor.id);
-    if (error) {
-      showError(error.message);
-    } else {
+    if (error) showError(error.message);
+    else {
       showSuccess("Video added.");
       setNewVideoUrl("");
       onUpdate();
@@ -336,26 +350,39 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
         </Button>
       </div>
       <AccordionContent className="space-y-6 pt-4">
-        {/* Descriptions */}
-        <div className="space-y-4">
-          <div>
-            <Label>Short Description</Label>
-            <p className="text-sm text-muted-foreground h-6">
-              {competitor.short_description || "Not generated yet."}
-            </p>
+        <div className="space-y-4 p-4 border rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <h4 className="font-medium">AI Generated Descriptions</h4>
+              <p className="text-sm text-muted-foreground">Generated by researching "{competitor.name}"</p>
+            </div>
+            {!competitor.short_description && (
+              <Button onClick={handleFetchInfo} disabled={isFetchingInfo} size="sm">
+                {isFetchingInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Fetch Info
+              </Button>
+            )}
           </div>
-          <div>
-            <Label>Long Description</Label>
-            <Textarea
-              readOnly
-              value={competitor.long_description || "Not generated yet."}
-              className="text-sm text-muted-foreground"
-              rows={4}
-            />
+          <div className="space-y-4 pt-4">
+            <div>
+              <Label>Short Description</Label>
+              <p className="text-sm text-muted-foreground min-h-[1rem] pt-1">
+                {competitor.short_description || "Not generated yet."}
+              </p>
+            </div>
+            <div>
+              <Label>Long Description</Label>
+              {competitor.long_description ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none mt-2">
+                  <ReactMarkdown>{competitor.long_description}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground min-h-[1rem] pt-1">Not generated yet.</p>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Videos */}
         <div className="space-y-4 p-4 border rounded-lg">
           <h4 className="font-medium">YouTube Videos</h4>
           <div className="space-y-2">
@@ -375,7 +402,6 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
           </div>
         </div>
 
-        {/* Screenshots */}
         <div className="space-y-4 p-4 border rounded-lg">
           <h4 className="font-medium">Screenshots</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -400,9 +426,9 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
               {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Upload
             </Button>
-            <Button onClick={handleGenerateDetails} disabled={isGenerating || !hasNewScreenshots}>
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {hasNewScreenshots ? `Generate Details for ${newScreenshotsCount} image(s)` : 'AI Details Up-to-Date'}
+            <Button onClick={handleGenerateTitles} disabled={isGeneratingTitles || !hasNewScreenshots}>
+              {isGeneratingTitles ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {hasNewScreenshots ? `Generate Titles for ${newScreenshotsCount} image(s)` : 'Titles Up-to-Date'}
             </Button>
           </div>
         </div>
