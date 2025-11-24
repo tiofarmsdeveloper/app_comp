@@ -26,11 +26,11 @@ serve(async (req) => {
       .eq('key', 'gemini_model')
       .single();
 
-    if (modelError && modelError.code !== 'PGRST116') { // Ignore 'not found' error
+    if (modelError && modelError.code !== 'PGRST116') {
       throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
     }
     
-    const modelName = modelSetting?.value || 'gemini-pro'; // Fallback to gemini-pro
+    const modelName = modelSetting?.value || 'gemini-pro';
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
@@ -45,26 +45,33 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const competitorAnalysesText = competitorAnalyses.map((comp, index) => `
---- COMPETITOR ${index + 1}: ${comp.name} ---
+    const competitorAnalysesText = competitorAnalyses.map((comp) => `
+--- COMPETITOR: ${comp.name} ---
 ${comp.analysis}
     `).join('\n');
     
     const competitorNames = competitorAnalyses.map(c => c.name).join(', ');
 
     const prompt = `
-You are a UX and product strategy expert.
+You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable.
+You have deep knowledge of the competitive landscape and common user feedback from app store reviews.
+
 First, here is an analysis of a user-submitted fintech app screenshot:
 --- USER APP ANALYSIS ---
 ${userAnalysis}
+
 Now, here are the analyses of several competitor apps:
 ${competitorAnalysesText}
---- TASK ---
+
+--- YOUR TASK ---
 Based on all the provided analyses, compare the user's app against the competitors (${competitorNames}).
+In your recommendations, incorporate insights as if you have analyzed thousands of app store reviews. For example, mention common user complaints (like hidden fees, poor customer service, confusing navigation) and praises (clear transaction history, easy budgeting tools, responsive support).
+
 Structure your response into three sections using markdown for formatting:
-1.  **What the user's app does better:** Identify 2-3 key strengths.
-2.  **What competitors do better:** Identify 2-3 key areas where competitors excel. Refer to specific competitors by name.
-3.  **5 Actionable Recommendations:** Provide five specific, concrete recommendations for the user's app to improve its competitive positioning. These should be actionable and clear.
+1.  **Key Strengths vs. Competitors:** Identify 2-3 clear advantages the user's app has. Be specific.
+2.  **Critical Competitive Gaps:** Identify 2-3 key areas where competitors are significantly better. Refer to specific competitors by name.
+3.  **5 Actionable Recommendations (From User Reviews):** Provide five concrete recommendations to gain a competitive edge. Frame these as solutions to common user problems seen in reviews. Each recommendation must be clear and actionable.
+
 Format the output as clean, structured markdown. Do not include a preamble or introduction.
 `;
 

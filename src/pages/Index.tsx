@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import {
   showError,
   showSuccess,
@@ -14,7 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/components/AnalysisResult";
 import { ComparisonResult } from "@/components/ComparisonResult";
-import { Loader2, Settings } from "lucide-react";
+import { Loader2, Settings, History } from "lucide-react";
 
 const competitors = [
   { name: "Revolut", path: "/competitors/revolut.png" },
@@ -65,6 +64,7 @@ const Index = () => {
     const toastId = showLoading("Starting analysis...");
 
     try {
+      // Step 1: Analyze user and competitor images
       setLoadingMessage(`Analyzing your screenshot...`);
       const userAnalysisPromise = analyzeImage(uploadedFile);
 
@@ -86,8 +86,9 @@ const Index = () => {
 
       setUserAnalysis(userResult);
       showSuccess("Initial analyses complete. Now comparing...");
+      
+      // Step 2: Get comparison
       setLoadingMessage("Comparing against competitors...");
-
       const { data: comparisonData, error: comparisonError } =
         await supabase.functions.invoke("compare-analyses", {
           body: {
@@ -101,9 +102,30 @@ const Index = () => {
 
       if (comparisonError) throw new Error(comparisonError.message);
       if (comparisonData.error) throw new Error(comparisonData.error);
+      const comparison = comparisonData.comparison;
+      setComparisonResult(comparison);
+      
+      // Step 3: Generate title
+      setLoadingMessage("Generating title...");
+      const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", {
+        body: { analysis: userResult },
+      });
+      if (titleError) throw new Error(titleError.message);
+      if (titleData.error) throw new Error(titleData.error);
+      const title = titleData.title;
 
-      setComparisonResult(comparisonData.comparison);
-      showSuccess("Comparison complete!");
+      // Step 4: Save to history
+      setLoadingMessage("Saving to history...");
+      const { error: insertError } = await supabase
+        .from("analysis_history")
+        .insert({
+          title: title,
+          user_analysis: userResult,
+          comparison_result: comparison,
+        });
+      if (insertError) throw insertError;
+
+      showSuccess("Analysis complete and saved to history!");
     } catch (err) {
       console.error("Full analysis process failed:", err);
       showError(
@@ -131,16 +153,18 @@ const Index = () => {
           <AnalysisResult result={userAnalysis} onClear={handleClear} />
           {comparisonResult && <ComparisonResult result={comparisonResult} />}
         </div>
-        <div className="absolute bottom-0">
-          <MadeWithDyad />
-        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/history">
+            <History className="h-5 w-5" />
+          </Link>
+        </Button>
         <Button variant="ghost" size="icon" asChild>
           <Link to="/settings">
             <Settings className="h-5 w-5" />
@@ -173,9 +197,6 @@ const Index = () => {
             )}
           </Button>
         </div>
-      </div>
-      <div className="absolute bottom-0">
-        <MadeWithDyad />
       </div>
     </div>
   );
