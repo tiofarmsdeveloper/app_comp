@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import {
   showError,
   showSuccess,
@@ -66,7 +67,7 @@ const Index = () => {
             return { ...c, imageUrl };
           })
         );
-        setAllCompetitors(competitorsWithUrls.filter(c => c.imageUrl !== "/placeholder.svg"));
+        setAllCompetitors(competitorsWithUrls);
       }
     };
     fetchCompetitors();
@@ -86,6 +87,14 @@ const Index = () => {
             ? prev.filter(id => id !== competitorId)
             : [...prev, competitorId]
     );
+  };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedCompetitors(allCompetitors.map(c => c.id));
+    } else {
+      setSelectedCompetitors([]);
+    }
   };
 
   const analyzeImage = async (file: File): Promise<string> => {
@@ -224,6 +233,20 @@ const Index = () => {
               <CardContent>
                 {allCompetitors.length > 0 ? (
                   <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        id="select-all"
+                        checked={allCompetitors.length > 0 && selectedCompetitors.length === allCompetitors.length}
+                        onCheckedChange={handleSelectAll}
+                      />
+                      <label
+                        htmlFor="select-all"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 font-semibold"
+                      >
+                        Select All
+                      </label>
+                    </div>
+                    <Separator className="my-2" />
                     {allCompetitors.map(c => (
                       <div key={c.id} className="flex items-center space-x-3">
                         <Checkbox 
