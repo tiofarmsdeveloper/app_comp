@@ -26,6 +26,8 @@ import { Loader2, Settings, History } from "lucide-react";
 interface Competitor {
   id: string;
   name: string;
+  short_description: string | null;
+  long_description: string | null;
   imageUrl: string;
 }
 
@@ -42,7 +44,7 @@ const Index = () => {
     const fetchCompetitors = async () => {
       const { data: competitorsData, error } = await supabase
         .from("competitors")
-        .select("id, name");
+        .select("id, name, short_description, long_description");
 
       if (error) {
         console.error("Failed to fetch competitors for analysis", error);
@@ -61,7 +63,7 @@ const Index = () => {
               imageUrl = publicUrl;
             }
             
-            return { id: c.id, name: c.name, imageUrl };
+            return { ...c, imageUrl };
           })
         );
         setAllCompetitors(competitorsWithUrls.filter(c => c.imageUrl !== "/placeholder.svg"));
@@ -78,20 +80,20 @@ const Index = () => {
     }
   };
 
-  const handleSelectCompetitor = (competitorName: string) => {
+  const handleSelectCompetitor = (competitorId: string) => {
     setSelectedCompetitors(prev => 
-        prev.includes(competitorName)
-            ? prev.filter(name => name !== competitorName)
-            : [...prev, competitorName]
+        prev.includes(competitorId)
+            ? prev.filter(id => id !== competitorId)
+            : [...prev, competitorId]
     );
   };
 
-  const analyzeImage = async (file: File, fileName: string): Promise<string> => {
+  const analyzeImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
     const { data, error } = await supabase.functions.invoke("analyze-image", { body: formData });
-    if (error) throw new Error(`Analysis failed for ${fileName}: ${error.message}`);
-    if (data.error) throw new Error(`Analysis failed for ${fileName}: ${data.error}`);
+    if (error) throw new Error(`Analysis failed: ${error.message}`);
+    if (data.error) throw new Error(`Analysis failed: ${data.error}`);
     return data.analysis;
   };
 
@@ -106,30 +108,37 @@ const Index = () => {
 
     try {
       setLoadingMessage(`Analyzing your screenshot...`);
-      const userResult = await analyzeImage(uploadedFile, uploadedFile.name);
+      const userResult = await analyzeImage(uploadedFile);
       setUserAnalysis(userResult);
+      dismissToast(toastId);
       showSuccess("Your screenshot analysis is complete.");
 
       let finalComparisonResult: string;
 
       if (selectedCompetitors.length > 0) {
-        setLoadingMessage(`Analyzing ${selectedCompetitors.length} competitors...`);
-        const competitorsToAnalyze = allCompetitors.filter(c => selectedCompetitors.includes(c.name));
+        const competitorsToAnalyze = allCompetitors.filter(c => selectedCompetitors.includes(c.id));
         
-        const competitorPromises = competitorsToAnalyze.map(async (competitor) => {
-          const response = await fetch(competitor.imageUrl);
-          if (!response.ok) throw new Error(`Failed to fetch ${competitor.name} screenshot.`);
-          const blob = await response.blob();
-          const file = new File([blob], competitor.name, { type: blob.type });
-          const analysis = await analyzeImage(file, competitor.name);
-          return { name: competitor.name, analysis };
-        });
-
-        const competitorResults = await Promise.all(competitorPromises);
+        const augmentedCompetitorAnalyses = await Promise.all(
+          competitorsToAnalyze.map(async (competitor, index) => {
+            setLoadingMessage(`Researching competitor ${index + 1} of ${competitorsToAnalyze.length}: ${competitor.name}...`);
+            const { data, error } = await supabase.functions.invoke("augment-competitor-data", {
+              body: {
+                competitor_name: competitor.name,
+                competitor_data: {
+                  short_description: competitor.short_description,
+                  long_description: competitor.long_description,
+                }
+              }
+            });
+            if (error) throw new Error(`Failed to research ${competitor.name}: ${error.message}`);
+            if (data.error) throw new Error(`Failed to research ${competitor.name}: ${data.error}`);
+            return { name: competitor.name, analysis: data.analysis };
+          })
+        );
         
-        setLoadingMessage("Comparing against competitors...");
+        setLoadingMessage("Generating final comparison report...");
         const { data: comparisonData, error: comparisonError } = await supabase.functions.invoke("compare-analyses", {
-          body: { userAnalysis: userResult, competitorAnalyses: competitorResults },
+          body: { userAnalysis: userResult, competitorAnalyses: augmentedCompetitorAnalyses },
         });
         if (comparisonError) throw new Error(comparisonError.message);
         if (comparisonData.error) throw new Error(comparisonData.error);
@@ -219,8 +228,8 @@ const Index = () => {
                       <div key={c.id} className="flex items-center space-x-3">
                         <Checkbox 
                           id={c.id} 
-                          checked={selectedCompetitors.includes(c.name)}
-                          onCheckedChange={() => handleSelectCompetitor(c.name)}
+                          checked={selectedCompetitors.includes(c.id)}
+                          onCheckedChange={() => handleSelectCompetitor(c.id)}
                         />
                         <label htmlFor={c.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                           {c.name}
