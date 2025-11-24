@@ -37,11 +37,9 @@ serve(async (req) => {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
-You are a business analyst. Research the fintech company named "${competitor_name}".
-Find their official website and other relevant public links (like App Store, Play Store, or social media).
-Based on your research, generate:
-1. A short_description: A concise, one-sentence summary of the company's primary function.
-2. A long_description: A detailed paragraph (3-5 sentences) describing the company, its key products, and its target audience. Incorporate the links you found directly into the description using markdown format, for example: [Official Website](https://example.com).
+You are a business analyst with extensive knowledge of the tech industry. Based on your knowledge of the fintech company named "${competitor_name}", generate the following:
+1.  A short_description: A concise, one-sentence summary of the company's primary function.
+2.  A long_description: A detailed paragraph (3-5 sentences) describing the company, its key products, and its target audience. If you know their official website or other relevant public links, incorporate them into the description using markdown format, for example: [Official Website](https://example.com).
 
 Provide the output in a single, valid JSON object with the following structure. Do not include any other text or markdown formatting.
 {
@@ -57,9 +55,13 @@ Provide the output in a single, valid JSON object with the following structure. 
     let aiResult;
     try {
       aiResult = JSON.parse(jsonText);
+      if (!aiResult.short_description || !aiResult.long_description) {
+        throw new Error("AI response is missing required description fields.");
+      }
     } catch (e) {
       console.error("Failed to parse JSON from AI response:", jsonText);
-      throw new Error("AI returned an invalid response format.");
+      console.error("Original error:", e.message);
+      throw new Error("AI returned an invalid response format. Please try again.");
     }
 
     const { error: updateError } = await supabase
@@ -70,7 +72,10 @@ Provide the output in a single, valid JSON object with the following structure. 
       })
       .eq('id', competitor_id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+        console.error("Supabase update error:", updateError.message);
+        throw updateError;
+    }
 
     return new Response(JSON.stringify({ success: true, data: aiResult }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
