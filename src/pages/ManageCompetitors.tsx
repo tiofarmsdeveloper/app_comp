@@ -270,10 +270,11 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
     const toastId = showLoading("Generating AI details...");
     try {
       const screenshot_ids = screenshotsToProcess.map(s => s.id);
-      const { error } = await supabase.functions.invoke("generate-competitor-details", {
+      const { data, error } = await supabase.functions.invoke("generate-competitor-details", {
         body: { competitor_id: competitor.id, screenshot_ids },
       });
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
       showSuccess("AI details generated successfully.");
       onUpdate();
     } catch (err) {
@@ -323,7 +324,8 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
     }
   };
 
-  const hasNewScreenshots = competitor.screenshots.some(s => !s.ai_title);
+  const newScreenshotsCount = competitor.screenshots.filter(s => !s.ai_title).length;
+  const hasNewScreenshots = newScreenshotsCount > 0;
 
   return (
     <AccordionItem value={competitor.id}>
@@ -400,7 +402,7 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
             </Button>
             <Button onClick={handleGenerateDetails} disabled={isGenerating || !hasNewScreenshots}>
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Generate AI Details
+              {hasNewScreenshots ? `Generate Details for ${newScreenshotsCount} image(s)` : 'AI Details Up-to-Date'}
             </Button>
           </div>
         </div>
