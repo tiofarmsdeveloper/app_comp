@@ -21,7 +21,7 @@ import {
 } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/components/AnalysisResult";
-import { ComparisonResult } from "@/components/ComparisonResult";
+import { SingleComparisonResult, ComparisonData } from "@/components/SingleComparisonResult";
 import { Loader2, Settings, History } from "lucide-react";
 
 interface Competitor {
@@ -37,7 +37,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
-  const [comparisonResult, setComparisonResult] = useState<string | null>(null);
+  const [comparisonResults, setComparisonResults] = useState<ComparisonData[]>([]);
   const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
   const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>([]);
 
@@ -75,9 +75,9 @@ const Index = () => {
 
   const handleFileChange = (file: File | null) => {
     setUploadedFile(file);
-    if (userAnalysis || comparisonResult) {
+    if (userAnalysis || comparisonResults.length > 0) {
       setUserAnalysis(null);
-      setComparisonResult(null);
+      setComparisonResults([]);
     }
   };
 
@@ -106,6 +106,29 @@ const Index = () => {
     return data.analysis;
   };
 
+  const formatResultsForHistory = (userAnalysis: string, comparisonResults: ComparisonData[]): string => {
+    if (comparisonResults.length === 0) {
+      return "No direct comparison was performed.";
+    }
+    
+    let markdown = "";
+    comparisonResults.forEach(result => {
+      markdown += `## Comparison vs. ${result.competitor_name}\n\n`;
+      markdown += `**Summary:** ${result.comparison_summary}\n\n`;
+      markdown += `**Ratings:**\n- Your App: ${'★'.repeat(Math.round(result.user_app_rating))}${'☆'.repeat(5 - Math.round(result.user_app_rating))}\n`;
+      markdown += `- ${result.competitor_name}: ${'★'.repeat(Math.round(result.competitor_app_rating))}${'☆'.repeat(5 - Math.round(result.competitor_app_rating))}\n\n`;
+      markdown += `### Your App's Strengths\n`;
+      result.user_app_strengths.forEach(s => markdown += `- ${s}\n`);
+      markdown += `\n### ${result.competitor_name}'s Strengths\n`;
+      result.competitor_app_strengths.forEach(s => markdown += `- ${s}\n`);
+      markdown += `\n### Actionable Recommendations\n`;
+      result.actionable_recommendations.forEach(r => markdown += `- ${r}\n`);
+      markdown += `\n---\n\n`;
+    });
+
+    return markdown;
+  };
+
   const handleAnalyze = async () => {
     if (!uploadedFile) {
       showError("Please upload a screenshot first.");
@@ -122,48 +145,40 @@ const Index = () => {
       dismissToast(toastId);
       showSuccess("Your screenshot analysis is complete.");
 
-      let finalComparisonResult: string;
-
       if (selectedCompetitors.length > 0) {
         const competitorsToAnalyze = allCompetitors.filter(c => selectedCompetitors.includes(c.id));
         
-        const augmentedCompetitorAnalyses = await Promise.all(
-          competitorsToAnalyze.map(async (competitor, index) => {
-            setLoadingMessage(`Researching competitor ${index + 1} of ${competitorsToAnalyze.length}: ${competitor.name}...`);
-            const { data, error } = await supabase.functions.invoke("augment-competitor-data", {
-              body: {
-                competitor_name: competitor.name,
-                competitor_data: {
-                  short_description: competitor.short_description,
-                  long_description: competitor.long_description,
-                }
+        for (let i = 0; i < competitorsToAnalyze.length; i++) {
+          const competitor = competitorsToAnalyze[i];
+          setLoadingMessage(`Researching & comparing with ${competitor.name} (${i + 1}/${competitorsToAnalyze.length})...`);
+          
+          const { data: augmentData, error: augmentError } = await supabase.functions.invoke("augment-competitor-data", {
+            body: {
+              competitor_name: competitor.name,
+              competitor_data: {
+                short_description: competitor.short_description,
+                long_description: competitor.long_description,
               }
-            });
-            if (error) throw new Error(`Failed to research ${competitor.name}: ${error.message}`);
-            if (data.error) throw new Error(`Failed to research ${competitor.name}: ${data.error}`);
-            return { name: competitor.name, analysis: data.analysis };
-          })
-        );
-        
-        setLoadingMessage("Generating final comparison report...");
-        const { data: comparisonData, error: comparisonError } = await supabase.functions.invoke("compare-analyses", {
-          body: { userAnalysis: userResult, competitorAnalyses: augmentedCompetitorAnalyses },
-        });
-        if (comparisonError) throw new Error(comparisonError.message);
-        if (comparisonData.error) throw new Error(comparisonData.error);
-        finalComparisonResult = comparisonData.comparison;
+            }
+          });
+          if (augmentError) throw new Error(`Failed to research ${competitor.name}: ${augmentError.message}`);
+          if (augmentData.error) throw new Error(`Failed to research ${competitor.name}: ${augmentData.error}`);
+          
+          const { data: comparisonData, error: comparisonError } = await supabase.functions.invoke("compare-single-competitor", {
+            body: { 
+              userAnalysis: userResult, 
+              competitorAnalysis: augmentData.analysis,
+              competitorName: competitor.name,
+            },
+          });
+          if (comparisonError) throw new Error(comparisonError.message);
+          if (comparisonData.error) throw new Error(comparisonData.error);
 
+          setComparisonResults(prev => [...prev, comparisonData]);
+        }
       } else {
-        setLoadingMessage("Generating general analysis...");
-        const { data, error } = await supabase.functions.invoke("generate-generic-analysis", {
-            body: { userAnalysis: userResult }
-        });
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
-        finalComparisonResult = data.analysis;
+        showSuccess("General analysis will be available in history.");
       }
-      
-      setComparisonResult(finalComparisonResult);
       
       setLoadingMessage("Generating title...");
       const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", { body: { analysis: userResult } });
@@ -172,10 +187,11 @@ const Index = () => {
       const title = titleData.title;
 
       setLoadingMessage("Saving to history...");
+      const comparisonMarkdown = formatResultsForHistory(userResult, comparisonResults);
       await supabase.from("analysis_history").insert({
         title: title,
         user_analysis: userResult,
-        comparison_result: finalComparisonResult,
+        comparison_result: comparisonMarkdown,
       });
 
       showSuccess("Analysis complete and saved to history!");
@@ -192,16 +208,18 @@ const Index = () => {
   const handleClear = () => {
     setUploadedFile(null);
     setUserAnalysis(null);
-    setComparisonResult(null);
+    setComparisonResults([]);
     setSelectedCompetitors([]);
   };
 
   if (userAnalysis) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 py-12">
+      <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
         <div className="w-full max-w-2xl">
           <AnalysisResult result={userAnalysis} onClear={handleClear} />
-          {comparisonResult && <ComparisonResult result={comparisonResult} />}
+          {comparisonResults.map((result, index) => (
+            <SingleComparisonResult key={index} data={result} />
+          ))}
         </div>
       </div>
     );
