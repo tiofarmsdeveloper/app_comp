@@ -30,18 +30,31 @@ const Index = () => {
 
   useEffect(() => {
     const fetchCompetitors = async () => {
-      const { data, error } = await supabase
+      const { data: competitorsData, error } = await supabase
         .from("competitors")
-        .select("name, image_path");
+        .select("id, name");
 
       if (error) {
         console.error("Failed to fetch competitors for analysis", error);
       } else {
-        const competitorsWithUrls = data.map(c => {
-          const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(c.image_path);
-          return { name: c.name, imageUrl: publicUrl };
-        });
-        setCompetitors(competitorsWithUrls);
+        const competitorsWithUrls = await Promise.all(
+          (competitorsData || []).map(async (c) => {
+            const { data: screenshots } = await supabase
+              .from("competitor_screenshots")
+              .select("image_path")
+              .eq("competitor_id", c.id)
+              .limit(1);
+            
+            let imageUrl = "/placeholder.svg"; // default
+            if (screenshots && screenshots.length > 0) {
+              const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(screenshots[0].image_path);
+              imageUrl = publicUrl;
+            }
+            
+            return { name: c.name, imageUrl };
+          })
+        );
+        setCompetitors(competitorsWithUrls.filter(c => c.imageUrl !== "/placeholder.svg"));
       }
     };
     fetchCompetitors();
@@ -77,7 +90,7 @@ const Index = () => {
       return;
     }
     if (competitors.length === 0) {
-      showError("Please add at least one competitor in the settings before analyzing.");
+      showError("Please add at least one competitor with a screenshot in the settings before analyzing.");
       return;
     }
 
