@@ -8,6 +8,7 @@ import {
 import { StarRating } from "./StarRating";
 import { Separator } from "./ui/separator";
 import { CheckCircle2, XCircle, Target } from "lucide-react";
+import { ComparisonSlider } from "./ComparisonSlider";
 
 export interface ComparisonData {
   competitor_name: string;
@@ -31,22 +32,29 @@ export const SingleComparisonResult = ({ data }: SingleComparisonResultProps) =>
         <CardDescription>{data.comparison_summary}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Ratings */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-          <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-semibold mb-2">Your App</h4>
-            <StarRating rating={data.user_app_rating} />
-            <p className="text-sm text-muted-foreground mt-1">
-              {data.user_app_rating.toFixed(1)} / 5.0
-            </p>
+        {/* Ratings & Slider */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-semibold mb-2">Your App</h4>
+              <StarRating rating={data.user_app_rating} />
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.user_app_rating.toFixed(1)} / 5.0
+              </p>
+            </div>
+            <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-semibold mb-2">{data.competitor_name}</h4>
+              <StarRating rating={data.competitor_app_rating} />
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.competitor_app_rating.toFixed(1)} / 5.0
+              </p>
+            </div>
           </div>
-          <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-semibold mb-2">{data.competitor_name}</h4>
-            <StarRating rating={data.competitor_app_rating} />
-            <p className="text-sm text-muted-foreground mt-1">
-              {data.competitor_app_rating.toFixed(1)} / 5.0
-            </p>
-          </div>
+          <ComparisonSlider 
+            userRating={data.user_app_rating}
+            competitorRating={data.competitor_app_rating}
+            competitorName={data.competitor_name}
+          />
         </div>
 
         <Separator />
