@@ -95,17 +95,6 @@ const Index = () => {
     }
   };
 
-  const analyzeImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const { data, error } = await supabase.functions.invoke("analyze-image", {
-      body: formData,
-    });
-    if (error) throw new Error(`Analysis failed for ${file.name}: ${error.message}`);
-    if (data.error) throw new Error(`Analysis failed for ${file.name}: ${data.error}`);
-    return data.analysis;
-  };
-
   const handleCompareScreenshots = async () => {
     if (!uploadedFile || competitorFiles.length === 0) {
       showError("Please upload your app's screenshot and at least one competitor screenshot.");
@@ -196,7 +185,12 @@ const Index = () => {
     const toastId = showLoading("Starting analysis...");
     try {
       setLoadingMessage("Analyzing your screenshot...");
-      const userAnalysisResult = await analyzeImage(uploadedFile);
+      const { data: userAnalysisData, error: userAnalysisError } = await supabase.functions.invoke("analyze-image", {
+        body: (() => { const fd = new FormData(); fd.append("file", uploadedFile); return fd; })(),
+      });
+      if (userAnalysisError) throw new Error(userAnalysisError.message);
+      if (userAnalysisData.error) throw new Error(userAnalysisData.error);
+      const userAnalysisResult = userAnalysisData.analysis;
       setUserAnalysis(userAnalysisResult);
 
       setLoadingMessage(`Analyzing ${savedCompetitors.length} saved competitor(s)...`);
@@ -206,8 +200,14 @@ const Index = () => {
           if (!response.ok) throw new Error(`Failed to fetch image for ${competitor.name}`);
           const blob = await response.blob();
           const file = new File([blob], competitor.name, { type: blob.type });
-          const analysis = await analyzeImage(file);
-          return { name: competitor.name, analysis };
+          
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke("analyze-image", {
+            body: (() => { const fd = new FormData(); fd.append("file", file); return fd; })(),
+          });
+          if (analysisError) throw new Error(analysisError.message);
+          if (analysisData.error) throw new Error(analysisData.error);
+
+          return { name: competitor.name, analysis: analysisData.analysis };
         })
       );
 
@@ -244,6 +244,8 @@ const Index = () => {
   const handleError = (err: unknown, message: string) => {
     console.error(message, err);
     showError(err instanceof Error ? err.message : message);
+    setIsLoading(false);
+    setLoadingMessage("");
   };
 
   const generateTitleAndSave = async (userResult: string, comparison: string) => {
@@ -320,11 +322,14 @@ const Index = () => {
         <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-tight">Sinder Competitor Analysis Tool</h1>
         <p className="text-lg text-muted-foreground mb-8">Upload a screenshot of your app to get started.</p>
 
-        <div className="flex flex-col items-center gap-6">
-          <FileUpload onFileChange={handleFileChange} />
+        <div className="flex flex-col items-center gap-8">
+          <div className="w-full max-w-lg space-y-3 text-left">
+            <Label className="text-base font-semibold">1. Upload Your App Screenshot (Sinder)</Label>
+            <FileUpload onFileChange={handleFileChange} id="sinder-upload" />
+          </div>
 
-          <div className="w-full max-w-lg space-y-2">
-            <Label htmlFor="analysis-mode">Analysis Mode</Label>
+          <div className="w-full max-w-lg space-y-3 text-left">
+            <Label htmlFor="analysis-mode" className="text-base font-semibold">2. Choose Analysis Mode</Label>
             <Select value={analysisMode} onValueChange={(v) => setAnalysisMode(v as AnalysisMode)}>
               <SelectTrigger id="analysis-mode">
                 <SelectValue placeholder="Select analysis mode" />
@@ -337,10 +342,15 @@ const Index = () => {
             </Select>
           </div>
 
-          {analysisMode === 'screenshot' && <MultiFileUpload onFilesChange={handleCompetitorFilesChange} />}
+          {analysisMode === 'screenshot' && (
+            <div className="w-full max-w-lg space-y-3 text-left">
+              <Label className="text-base font-semibold">3. Upload Competitor Screenshots</Label>
+              <MultiFileUpload onFilesChange={handleCompetitorFilesChange} id="competitor-upload" />
+            </div>
+          )}
           {analysisMode === 'saved' && (
             <div className="w-full max-w-lg p-4 border rounded-lg bg-muted/50 text-left">
-              <h3 className="text-sm font-medium text-muted-foreground mb-3">Comparing against your saved list:</h3>
+              <h3 className="text-base font-semibold mb-3">3. Comparing Against Your Saved List</h3>
               <div className="space-y-2">
                 {isFetchingCompetitors ? (
                   [...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)

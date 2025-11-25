@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface MultiFileUploadProps {
   onFilesChange: (files: File[]) => void;
   className?: string;
+  id?: string;
 }
 
-export const MultiFileUpload = ({ onFilesChange, className }: MultiFileUploadProps) => {
+export const MultiFileUpload = ({ onFilesChange, className, id }: MultiFileUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,8 +73,9 @@ export const MultiFileUpload = ({ onFilesChange, className }: MultiFileUploadPro
   };
 
   return (
-    <div className={cn("w-full max-w-lg", className)}>
+    <div className={cn("w-full", className)}>
       <div
+        id={id}
         className={cn(
           "flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
           isDragging

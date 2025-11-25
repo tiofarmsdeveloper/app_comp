@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils";
 
 interface FileUploadProps {
   onFileChange: (file: File | null) => void;
+  id?: string;
 }
 
-export const FileUpload = ({ onFileChange }: FileUploadProps) => {
+export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +77,7 @@ export const FileUpload = ({ onFileChange }: FileUploadProps) => {
   };
 
   return (
-    <div className="w-full max-w-lg">
+    <div className="w-full">
       {file ? (
         <div className="relative flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
           <div className="flex items-center gap-4">
@@ -99,6 +100,7 @@ export const FileUpload = ({ onFileChange }: FileUploadProps) => {
         </div>
       ) : (
         <div
+          id={id}
           className={cn(
             "flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
             isDragging
