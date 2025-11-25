@@ -114,39 +114,46 @@ const Index = () => {
     
     const toastId = showLoading("Starting analysis...");
     try {
-      setLoadingMessage("Analyzing your screenshot...");
-      const userAnalysisResult = await analyzeImage(uploadedFile);
-      setUserAnalysis(userAnalysisResult);
+      setLoadingMessage(`Comparing against ${competitorFiles.length} competitor(s)...`);
 
-      setLoadingMessage(`Analyzing ${competitorFiles.length} competitor(s)...`);
-      const competitorAnalyses = await Promise.all(competitorFiles.map(file => analyzeImage(file)));
-
-      setLoadingMessage("Generating comparisons...");
-      const comparisonPromises = competitorAnalyses.map((compAnalysis, index) =>
-        supabase.functions.invoke("compare-screenshots", {
-          body: {
-            userAnalysis: userAnalysisResult,
-            competitorAnalysis: compAnalysis,
-            competitorName: competitorFiles[index].name,
-          },
-        })
-      );
-      
-      const comparisonResponses = await Promise.all(comparisonPromises);
+      let userAnalysisResult: string | null = null;
       const results: Comparison[] = [];
-      for (let i = 0; i < comparisonResponses.length; i++) {
-        const { data, error } = comparisonResponses[i];
+
+      for (let i = 0; i < competitorFiles.length; i++) {
+        const competitorFile = competitorFiles[i];
+        setLoadingMessage(`Analyzing vs. ${competitorFile.name}...`);
+
+        const formData = new FormData();
+        formData.append("userFile", uploadedFile);
+        formData.append("competitorFile", competitorFile);
+        formData.append("competitorName", competitorFile.name);
+
+        const { data, error } = await supabase.functions.invoke("direct-compare-screenshots", {
+          body: formData,
+        });
+
         if (error) throw new Error(error.message);
         if (data.error) throw new Error(data.error);
+
+        if (!userAnalysisResult) {
+          userAnalysisResult = data.userAnalysis;
+          setUserAnalysis(userAnalysisResult);
+        }
+
         results.push({
-          title: `Comparison vs. ${competitorFiles[i].name.split('.').slice(0, -1).join('.')}`,
+          title: `Comparison vs. ${competitorFile.name.split('.').slice(0, -1).join('.')}`,
           content: data.comparison,
         });
       }
+      
       setComparisonResults(results);
 
-      const combinedComparison = results.map(r => `## ${r.title}\n\n${r.content}`).join("\n\n---\n\n");
-      await generateTitleAndSave(userAnalysisResult, combinedComparison);
+      if (userAnalysisResult) {
+        const combinedComparison = results.map(r => `## ${r.title}\n\n${r.content}`).join("\n\n---\n\n");
+        await generateTitleAndSave(userAnalysisResult, combinedComparison);
+      } else {
+        throw new Error("Failed to get user analysis from the comparison function.");
+      }
     } catch (err) {
       handleError(err, "Screenshot comparison failed.");
     } finally {
@@ -304,13 +311,13 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 pt-20 sm:pt-4">
       <div className="absolute top-4 right-16 flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild><Link to="/history"><History className="h-5 w-5" /></Link></Button>
         <Button variant="ghost" size="icon" asChild><Link to="/settings"><Settings className="h-5 w-5" /></Link></Button>
       </div>
       <div className="w-full max-w-2xl text-center">
-        <h1 className="text-4xl font-bold mb-2 tracking-tight">Sinder Competitor Analysis Tool</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-tight">Sinder Competitor Analysis Tool</h1>
         <p className="text-lg text-muted-foreground mb-8">Upload a screenshot of your app to get started.</p>
 
         <div className="flex flex-col items-center gap-6">
