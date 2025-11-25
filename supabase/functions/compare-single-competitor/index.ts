@@ -63,9 +63,10 @@ Provide a detailed comparison. Your entire response must be a single, valid JSON
 
 {
   "competitor_name": "${competitorName}",
+  "competitor_analysis_markdown": ${JSON.stringify(competitorAnalysis)},
   "comparison_summary": "A brief, one-sentence summary of the comparison, highlighting the key difference.",
-  "user_app_rating": <A number between 1.0 and 5.0 representing the user app's overall quality>,
-  "competitor_app_rating": <A number between 1.0 and 5.0 representing the competitor's overall quality>,
+  "user_app_rating": <A number between 1.0 and 5.0 representing the user app's overall quality based on the analysis>,
+  "competitor_app_rating": <A number between 1.0 and 5.0 representing the competitor's overall quality based on the analysis>,
   "user_app_strengths": ["A key strength of the user's app.", "Another key strength."],
   "competitor_app_strengths": ["A key strength of the competitor's app.", "Another key strength."],
   "actionable_recommendations": ["A concrete recommendation for the user's app to gain an edge.", "Another actionable recommendation."]

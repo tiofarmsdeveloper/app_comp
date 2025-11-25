@@ -103,6 +103,8 @@ const Index = () => {
       result.competitor_app_strengths.forEach(s => markdown += `- ${s}\n`);
       markdown += `\n### Actionable Recommendations\n`;
       result.actionable_recommendations.forEach(r => markdown += `- ${r}\n`);
+      markdown += `\n### Full AI Analysis for ${result.competitor_name}\n\n`;
+      markdown += `${result.competitor_analysis_markdown}\n\n`;
       markdown += `\n---\n\n`;
     });
 

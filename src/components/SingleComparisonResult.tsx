@@ -9,6 +9,13 @@ import { StarRating } from "./StarRating";
 import { Separator } from "./ui/separator";
 import { CheckCircle2, XCircle, Target } from "lucide-react";
 import { ComparisonSlider } from "./ComparisonSlider";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import ReactMarkdown from "react-markdown";
 
 export interface ComparisonData {
   competitor_name: string;
@@ -18,6 +25,7 @@ export interface ComparisonData {
   user_app_strengths: string[];
   competitor_app_strengths: string[];
   actionable_recommendations: string[];
+  competitor_analysis_markdown: string;
 }
 
 interface SingleComparisonResultProps {
@@ -50,7 +58,7 @@ export const SingleComparisonResult = ({ data }: SingleComparisonResultProps) =>
               </p>
             </div>
           </div>
-          <ComparisonSlider 
+          <ComparisonSlider
             userRating={data.user_app_rating}
             competitorRating={data.competitor_app_rating}
             competitorName={data.competitor_name}
@@ -108,6 +116,24 @@ export const SingleComparisonResult = ({ data }: SingleComparisonResultProps) =>
             ))}
           </ul>
         </div>
+
+        <Separator />
+
+        {/* Full Competitor Analysis */}
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger>
+              View Full AI Analysis for {data.competitor_name}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none pt-2">
+                <ReactMarkdown>
+                  {data.competitor_analysis_markdown}
+                </ReactMarkdown>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );

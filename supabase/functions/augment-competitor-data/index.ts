@@ -64,7 +64,7 @@ serve(async (req) => {
     // Step 1: Get base analysis from text-only data
     const textPrompt = `
       You are a senior business and product strategist specializing in the fintech industry.
-      Analyze the following fintech company based ONLY on the text information provided.
+      Analyze the following fintech company based ONLY on the text information provided to create a baseline analysis of about 150 words.
       
       --- PROVIDED TEXT INFORMATION ---
       Name: ${competitor.name}
@@ -74,6 +74,7 @@ serve(async (req) => {
 
       --- YOUR ANALYSIS TASK ---
       Provide a baseline analysis covering: Key Features, Unique Selling Propositions, Target Audience, Strengths, and Weaknesses.
+      If information for a category is not available from the provided data, explicitly state that instead of making assumptions.
       Format your response as structured markdown. This is the first step; we will add visual analysis later.
     `;
     const textResult = await model.generateContent(textPrompt);
@@ -87,7 +88,7 @@ serve(async (req) => {
 
         const imagePrompt = `
           You are a fintech product strategist. You have an existing analysis of a company. Now, you are receiving a new screenshot from their app.
-          Your task is to augment and refine the existing analysis with new insights from this screenshot.
+          Your task is to augment and refine the existing analysis with new insights from this screenshot, expanding the total length to approximately 300 words.
           Do not repeat information already present. Focus on adding new details about UI/UX, features, or user flows revealed in the image.
           Output the complete, updated analysis in structured markdown.
 
@@ -98,7 +99,7 @@ serve(async (req) => {
           (see attached image)
 
           --- YOUR TASK ---
-          Return the fully updated and integrated analysis.
+          Return the fully updated and integrated analysis, ensuring the final output is around 300 words.
         `;
         const imageResult = await model.generateContent([imagePrompt, imagePart]);
         augmentedAnalysis = (await imageResult.response).text();

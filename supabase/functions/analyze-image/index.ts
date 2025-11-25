@@ -60,7 +60,7 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const prompt = "Analyze this fintech app screenshot. Extract key information covering these topics: UI elements, visual hierarchy, color palette, information density, call-to-actions, trust signals, and user flow. Format the output as clean, structured markdown. Do not include any preamble, introduction, or conversational text. Do not use code blocks. Begin the response directly with the analysis.";
+    const prompt = "Analyze this fintech app screenshot in approximately 200 words. Extract key information covering these topics: UI elements, visual hierarchy, color palette, information density, call-to-actions, trust signals, and user flow. Format the output as clean, structured markdown. Do not include any preamble, introduction, or conversational text. Do not use code blocks. Begin the response directly with the analysis.";
     const imagePart = await fileToGenerativePart(file);
 
     const result = await model.generateContent([prompt, imagePart]);
