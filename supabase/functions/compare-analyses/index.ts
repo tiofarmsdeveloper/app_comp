@@ -20,17 +20,17 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { data: modelSetting, error: modelError } = await supabase
+    const { data: settings, error: settingsError } = await supabase
       .from('settings')
-      .select('value')
-      .eq('key', 'gemini_model')
-      .single();
+      .select('key, value')
+      .in('key', ['gemini_model', 'sinder_description']);
 
-    if (modelError && modelError.code !== 'PGRST116') {
-      throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
+    if (settingsError) {
+      throw new Error(`Failed to fetch settings: ${settingsError.message}`);
     }
-    
-    const modelName = modelSetting?.value || 'gemini-pro';
+
+    const modelName = settings.find(s => s.key === 'gemini_model')?.value || 'gemini-pro';
+    const sinderDescription = settings.find(s => s.key === 'sinder_description')?.value || "The user's app.";
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
@@ -56,7 +56,12 @@ ${comp.analysis}
 You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable.
 You have deep knowledge of the competitive landscape and common user feedback from app store reviews.
 
-First, here is an analysis of a user-submitted fintech app screenshot:
+Here is a brief description of the user's app, Sinder:
+--- SINDER DESCRIPTION ---
+${sinderDescription}
+---
+
+First, here is an analysis of a user-submitted fintech app screenshot (Sinder):
 --- USER APP ANALYSIS ---
 ${userAnalysis}
 

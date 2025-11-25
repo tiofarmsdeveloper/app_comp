@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { Loader2, ArrowLeft, Users } from "lucide-react";
 
@@ -27,30 +28,36 @@ const Settings = () => {
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
+  const [sinderDescription, setSinderDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
-    const fetchCurrentModel = async () => {
+    const fetchSettings = async () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from("settings")
-        .select("value")
-        .eq("key", "gemini_model")
-        .single();
+        .select("key, value")
+        .in("key", ["gemini_model", "sinder_description"]);
 
-      // PGRST116 means no rows found, which is not an error in this case.
-      if (error && error.code !== 'PGRST116') {
-        console.error("Error fetching current model:", error);
+      if (error) {
+        console.error("Error fetching settings:", error);
         showError(error.message);
-      } else if (data?.value) {
-        setCurrentModel(data.value);
-        setSelectedModel(data.value);
+      } else {
+        const modelSetting = data.find(d => d.key === 'gemini_model');
+        if (modelSetting) {
+          setCurrentModel(modelSetting.value);
+          setSelectedModel(modelSetting.value);
+        }
+        const descSetting = data.find(d => d.key === 'sinder_description');
+        if (descSetting) {
+          setSinderDescription(descSetting.value);
+        }
       }
       setIsLoading(false);
     };
 
-    fetchCurrentModel();
+    fetchSettings();
   }, []);
 
   const handleFetchModels = async () => {
@@ -73,20 +80,22 @@ const Settings = () => {
   };
 
   const handleSave = async () => {
-    if (!selectedModel) {
-      showError("Please select a model first.");
-      return;
-    }
     setIsLoading(true);
     const toastId = showLoading("Saving settings...");
     try {
+      const settingsToUpdate = [];
+      if (selectedModel) {
+        settingsToUpdate.push({ key: "gemini_model", value: selectedModel });
+      }
+      settingsToUpdate.push({ key: "sinder_description", value: sinderDescription });
+
       const { error } = await supabase
         .from("settings")
-        .upsert({ key: "gemini_model", value: selectedModel });
+        .upsert(settingsToUpdate);
 
       if (error) throw error;
 
-      setCurrentModel(selectedModel);
+      if (selectedModel) setCurrentModel(selectedModel);
       showSuccess("Settings saved successfully!");
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -116,6 +125,22 @@ const Settings = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-4 p-4 border rounded-lg">
+            <h3 className="font-semibold">Sinder App Description</h3>
+            <div className="space-y-2">
+              <Label htmlFor="sinder-description">
+                Provide a brief description of your app for the AI.
+              </Label>
+              <Textarea
+                id="sinder-description"
+                placeholder="e.g., Sinder is a mobile banking app for students, focusing on budgeting and savings goals..."
+                value={sinderDescription}
+                onChange={(e) => setSinderDescription(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
           <div className="space-y-4 p-4 border rounded-lg">
             <h3 className="font-semibold">AI Model Configuration</h3>
             <div className="space-y-2">
@@ -159,9 +184,9 @@ const Settings = () => {
 
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSave} disabled={isLoading || !selectedModel} className="w-full">
+          <Button onClick={handleSave} disabled={isLoading} className="w-full">
             {isLoading && !isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Model Settings
+            Save Settings
           </Button>
         </CardFooter>
       </Card>
