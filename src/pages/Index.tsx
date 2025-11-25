@@ -2,9 +2,16 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { FileUpload } from "@/components/FileUpload";
 import { MultiFileUpload } from "@/components/MultiFileUpload";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   showError,
   showSuccess,
@@ -12,9 +19,7 @@ import {
   dismissToast,
 } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
-import { AnalysisResult } from "@/components/AnalysisResult";
-import { ComparisonResult } from "@/components/ComparisonResult";
-import { Loader2, Settings, History } from "lucide-react";
+import { Loader2, Settings, History, RefreshCw } from "lucide-react";
 
 type AnalysisType = "auto" | "screenshot";
 
@@ -102,7 +107,7 @@ const Index = () => {
         if (error) throw new Error(error.message);
         if (data.error) throw new Error(data.error);
         results.push({
-          title: `Comparison vs. ${competitorFiles[i].name}`,
+          title: `Comparison vs. ${competitorFiles[i].name.split('.').slice(0, -1).join('.')}`,
           content: data.comparison,
         });
       }
@@ -193,11 +198,34 @@ const Index = () => {
   if (userAnalysis) {
     return (
       <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
-        <div className="w-full max-w-2xl">
-          <AnalysisResult result={userAnalysis} onClear={handleClearAll} />
-          {comparisonResults?.map((comp, index) => (
-            <ComparisonResult key={index} title={comp.title} result={comp.content} />
-          ))}
+        <div className="w-full max-w-3xl">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">Analysis Results</h2>
+            <Button variant="outline" onClick={handleClearAll}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Analyze Another
+            </Button>
+          </div>
+          <Accordion type="single" collapsible defaultValue="item-0" className="w-full rounded-lg border px-4">
+            <AccordionItem value="item-0">
+              <AccordionTrigger>Your App's Analysis</AccordionTrigger>
+              <AccordionContent>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown>{userAnalysis}</ReactMarkdown>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+            {comparisonResults?.map((comp, index) => (
+              <AccordionItem value={`item-${index + 1}`} key={index}>
+                <AccordionTrigger>{comp.title}</AccordionTrigger>
+                <AccordionContent>
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{comp.content}</ReactMarkdown>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </div>
     );
@@ -205,7 +233,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <div className="absolute top-4 right-4 flex items-center gap-2">
+      <div className="absolute top-4 right-16 flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild>
           <Link to="/history">
             <History className="h-5 w-5" />
