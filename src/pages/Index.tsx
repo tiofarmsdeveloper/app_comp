@@ -130,6 +130,8 @@ const Index = () => {
         const competitorsToAnalyze = allCompetitors.filter(c => selectedCompetitors.includes(c.id));
         
         for (let i = 0; i < competitorsToAnalyze.length; i++) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
           const competitor = competitorsToAnalyze[i];
           setLoadingMessage(`Researching & comparing with ${competitor.name} (${i + 1}/${competitorsToAnalyze.length})...`);
           
@@ -192,11 +194,21 @@ const Index = () => {
   if (userAnalysis) {
     return (
       <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-2xl space-y-4">
           <AnalysisResult result={userAnalysis} onClear={handleClear} />
           {comparisonResults.map((result, index) => (
             <SingleComparisonResult key={index} data={result} />
           ))}
+          {isLoading && (
+            <Card className="w-full max-w-2xl text-left mt-6">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                  <p className="text-sm font-medium">{loadingMessage}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     );
