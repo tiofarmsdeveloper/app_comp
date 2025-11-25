@@ -36,31 +36,26 @@ serve(async (req) => {
       .single();
 
     if (modelError && modelError.code !== 'PGRST116') { // Ignore 'not found' error
-      console.error("Supabase error fetching model:", modelError);
       throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
     }
     
-    const modelName = modelSetting?.value || 'gemini-1.5-flash'; // Fallback to a known good model
+    const modelName = modelSetting?.value || 'gemini-pro'; // Fallback to gemini-pro
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not set.");
-      throw new Error("Server configuration error: Missing API key.");
+      throw new Error("GEMINI_API_KEY is not set in environment variables.");
     }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {
-      return new Response(JSON.stringify({ error: "No file provided." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
+      throw new Error("No file provided.");
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const prompt = "Analyze this fintech app screenshot in approximately 200 words. Extract key information covering these topics: UI elements, visual hierarchy, color palette, information density, call-to-actions, trust signals, and user flow. Format the output as clean, structured markdown. Do not include any preamble, introduction, or conversational text. Do not use code blocks. Begin the response directly with the analysis.";
+    const prompt = "Analyze this fintech app screenshot. Extract: UI elements, visual hierarchy, color palette, information density, call-to-actions, trust signals, and user flow. Format as structured text.";
     const imagePart = await fileToGenerativePart(file);
 
     const result = await model.generateContent([prompt, imagePart]);
@@ -72,10 +67,10 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error in analyze-image function:", error.message);
+    console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200,
     });
   }
 });

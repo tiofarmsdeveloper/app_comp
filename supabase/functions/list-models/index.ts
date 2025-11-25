@@ -14,20 +14,18 @@ serve(async (req) => {
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not set.");
-      throw new Error("Server configuration error: Missing API key.");
+      throw new Error("GEMINI_API_KEY is not set in environment variables.");
     }
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Google API Error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Failed to fetch models from Google AI. Status: ${response.status}`);
+      const errorBody = await response.json();
+      throw new Error(`Failed to fetch models: ${errorBody.error.message}`);
     }
 
     const { models } = await response.json();
 
+    // Filter for models that can be used for vision analysis and text generation
     const supportedModels = models
       .filter(model => 
         model.supportedGenerationMethods.includes("generateContent") &&
@@ -41,10 +39,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error in list-models function:", error.message);
+    console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200,
     });
   }
 });

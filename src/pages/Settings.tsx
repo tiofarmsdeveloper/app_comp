@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { Loader2, ArrowLeft, Users } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 const Settings = () => {
   const [models, setModels] = useState<string[]>([]);
@@ -110,58 +110,50 @@ const Settings = () => {
             <div className="flex-grow">
               <CardTitle>Settings</CardTitle>
               <CardDescription>
-                Configure the AI model and manage competitors.
+                Configure the AI model for analysis.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4 p-4 border rounded-lg">
-            <h3 className="font-semibold">AI Model Configuration</h3>
-            <div className="space-y-2">
-              <Label>Current Model</Label>
-              <p className="text-sm text-muted-foreground h-6">
-                {isLoading ? "Loading..." : currentModel || "Not set"}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model-select">Gemini AI Model</Label>
-              <div className="flex gap-2">
-                <Select
-                  onValueChange={setSelectedModel}
-                  value={selectedModel || ""}
-                  disabled={models.length === 0}
-                >
-                  <SelectTrigger id="model-select">
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map((model) => (
-                      <SelectItem key={model} value={model}>
-                        {model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleFetchModels} variant="outline" disabled={isFetching}>
-                  {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
-                </Button>
-              </div>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Current Model</Label>
+            <p className="text-sm text-muted-foreground h-6">
+              {isLoading ? "Loading..." : currentModel || "Not set"}
+            </p>
           </div>
-          
-          <Link to="/settings/competitors" className="w-full">
-            <Button variant="outline" className="w-full">
-              <Users className="mr-2 h-4 w-4" />
-              Manage Competitors
-            </Button>
-          </Link>
-
+          <div className="space-y-2">
+            <Label htmlFor="model-select">Gemini AI Model</Label>
+            <div className="flex gap-2">
+              <Select
+                onValueChange={setSelectedModel}
+                value={selectedModel || ""}
+                disabled={models.length === 0}
+              >
+                <SelectTrigger id="model-select">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleFetchModels} variant="outline" disabled={isFetching}>
+                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Click 'Fetch' to get a list of compatible models from your Google AI account.
+            </p>
+          </div>
         </CardContent>
         <CardFooter>
           <Button onClick={handleSave} disabled={isLoading || !selectedModel} className="w-full">
             {isLoading && !isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Model Settings
+            Save Settings
           </Button>
         </CardFooter>
       </Card>

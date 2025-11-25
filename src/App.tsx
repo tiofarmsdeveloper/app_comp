@@ -8,7 +8,6 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import History from "./pages/History";
 import HistoryDetail from "./pages/HistoryDetail";
-import ManageCompetitors from "./pages/ManageCompetitors";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +20,6 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/settings/competitors" element={<ManageCompetitors />} />
           <Route path="/history" element={<History />} />
           <Route path="/history/:id" element={<HistoryDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { ComparisonResult } from "@/components/ComparisonResult";
 
 interface AnalysisDetail {
   title: string;
@@ -75,16 +76,7 @@ const HistoryDetail = () => {
               </CardContent>
             </Card>
             {analysis.comparison_result && (
-              <Card className="w-full text-left mt-6">
-                <CardHeader>
-                  <CardTitle>Comparison Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{analysis.comparison_result}</ReactMarkdown>
-                  </div>
-                </CardContent>
-              </Card>
+              <ComparisonResult result={analysis.comparison_result} />
             )}
           </>
         ) : (

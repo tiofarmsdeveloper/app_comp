@@ -20,31 +20,22 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { data: modelSetting, error: modelError } = await supabase
+    const { data: modelSetting } = await supabase
       .from('settings')
       .select('value')
       .eq('key', 'gemini_model')
       .single();
     
-    if (modelError && modelError.code !== 'PGRST116') {
-      console.error("Supabase error fetching model:", modelError);
-      throw new Error(`Failed to fetch model from settings: ${modelError.message}`);
-    }
-    
-    const modelName = modelSetting?.value || 'gemini-1.5-flash';
+    const modelName = modelSetting?.value || 'gemini-pro';
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not set.");
-      throw new Error("Server configuration error: Missing API key.");
+      throw new Error("GEMINI_API_KEY is not set.");
     }
 
     const { analysis } = await req.json();
     if (!analysis) {
-      return new Response(JSON.stringify({ error: "Analysis text is required." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
+      throw new Error("Analysis text is required.");
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -67,10 +58,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error in generate-title function:", error.message);
+    console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200,
     });
   }
 });
