@@ -22,7 +22,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { Loader2, ArrowLeft, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
+import { Header } from "@/components/Header";
 
 const Settings = () => {
   const [models, setModels] = useState<string[]>([]);
@@ -107,89 +108,83 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center mb-4">
-            <Button variant="ghost" size="icon" className="mr-2" asChild>
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex-grow">
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>
-                Configure the AI model and manage competitors.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4 p-4 border rounded-lg">
-            <h3 className="font-semibold">Sinder App Description</h3>
-            <div className="space-y-2">
-              <Label htmlFor="sinder-description">
-                Provide a brief description of your app for the AI.
-              </Label>
-              <Textarea
-                id="sinder-description"
-                placeholder="e.g., Sinder is a mobile banking app for students, focusing on budgeting and savings goals..."
-                value={sinderDescription}
-                onChange={(e) => setSinderDescription(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4 p-4 border rounded-lg">
-            <h3 className="font-semibold">AI Model Configuration</h3>
-            <div className="space-y-2">
-              <Label>Current Model</Label>
-              <p className="text-sm text-muted-foreground h-6">
-                {isLoading ? "Loading..." : currentModel || "Not set"}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model-select">Gemini AI Model</Label>
-              <div className="flex gap-2">
-                <Select
-                  onValueChange={setSelectedModel}
-                  value={selectedModel || ""}
-                  disabled={models.length === 0}
-                >
-                  <SelectTrigger id="model-select">
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map((model) => (
-                      <SelectItem key={model} value={model}>
-                        {model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleFetchModels} variant="outline" disabled={isFetching}>
-                  {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
-                </Button>
+    <div className="min-h-screen flex flex-col items-center bg-background text-foreground">
+      <Header />
+      <main className="flex-grow flex flex-col items-center justify-center p-4 w-full">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Settings</CardTitle>
+            <CardDescription>
+              Configure the AI model and manage competitors.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4 p-4 border rounded-lg">
+              <h3 className="font-semibold">Sinder App Description</h3>
+              <div className="space-y-2">
+                <Label htmlFor="sinder-description">
+                  Provide a brief description of your app for the AI.
+                </Label>
+                <Textarea
+                  id="sinder-description"
+                  placeholder="e.g., Sinder is a mobile banking app for students, focusing on budgeting and savings goals..."
+                  value={sinderDescription}
+                  onChange={(e) => setSinderDescription(e.target.value)}
+                  disabled={isLoading}
+                />
               </div>
             </div>
-          </div>
-          
-          <Link to="/settings/competitors" className="w-full">
-            <Button variant="outline" className="w-full">
-              <Users className="mr-2 h-4 w-4" />
-              Manage Competitors
-            </Button>
-          </Link>
 
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSave} disabled={isLoading} className="w-full">
-            {isLoading && !isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Settings
-          </Button>
-        </CardFooter>
-      </Card>
+            <div className="space-y-4 p-4 border rounded-lg">
+              <h3 className="font-semibold">AI Model Configuration</h3>
+              <div className="space-y-2">
+                <Label>Current Model</Label>
+                <p className="text-sm text-muted-foreground h-6">
+                  {isLoading ? "Loading..." : currentModel || "Not set"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="model-select">Gemini AI Model</Label>
+                <div className="flex gap-2">
+                  <Select
+                    onValueChange={setSelectedModel}
+                    value={selectedModel || ""}
+                    disabled={models.length === 0}
+                  >
+                    <SelectTrigger id="model-select">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleFetchModels} variant="outline" disabled={isFetching}>
+                    {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <Link to="/settings/competitors" className="w-full">
+              <Button variant="outline" className="w-full">
+                <Users className="mr-2 h-4 w-4" />
+                Manage Competitors
+              </Button>
+            </Link>
+
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleSave} disabled={isLoading} className="w-full">
+              {isLoading && !isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Settings
+            </Button>
+          </CardFooter>
+        </Card>
+      </main>
     </div>
   );
 };

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
@@ -11,8 +10,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { Header } from "@/components/Header";
 
 interface AnalysisDetail {
   title: string;
@@ -47,14 +46,10 @@ const HistoryDetail = () => {
   }, [id]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
-      <div className="w-full max-w-3xl">
+    <div className="min-h-screen flex flex-col items-center bg-background text-foreground">
+      <Header />
+      <main className="w-full max-w-3xl p-4">
         <div className="flex items-center mb-4">
-          <Button variant="ghost" size="icon" className="mr-2" asChild>
-            <Link to="/history">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
           {isLoading ? (
             <Skeleton className="h-8 w-3/4" />
           ) : (
@@ -91,7 +86,7 @@ const HistoryDetail = () => {
         ) : (
           <p>Analysis not found.</p>
         )}
-      </div>
+      </main>
     </div>
   );
 };

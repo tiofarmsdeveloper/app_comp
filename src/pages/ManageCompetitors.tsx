@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +19,8 @@ import {
   showLoading,
   dismissToast,
 } from "@/utils/toast";
-import { ArrowLeft, Trash2, PlusCircle, Image as ImageIcon } from "lucide-react";
+import { Trash2, PlusCircle, Image as ImageIcon } from "lucide-react";
+import { Header } from "@/components/Header";
 
 interface Competitor {
   id: string;
@@ -133,78 +133,72 @@ const ManageCompetitors = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="mr-2" asChild>
-              <Link to="/settings">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex-grow">
-              <CardTitle>Manage Competitors</CardTitle>
-              <CardDescription>
-                Add or remove competitors for the analysis.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-4">Add New Competitor</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div className="space-y-2">
-                <Label htmlFor="competitor-name">Competitor Name</Label>
-                <Input
-                  id="competitor-name"
-                  value={newCompetitorName}
-                  onChange={(e) => setNewCompetitorName(e.target.value)}
-                  placeholder="e.g., Revolut"
-                  disabled={isUploading}
-                />
+    <div className="min-h-screen flex flex-col items-center bg-background text-foreground">
+      <Header />
+      <main className="flex-grow flex flex-col items-center justify-center p-4 w-full">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle>Manage Competitors</CardTitle>
+            <CardDescription>
+              Add or remove competitors for the analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Add New Competitor</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="competitor-name">Competitor Name</Label>
+                  <Input
+                    id="competitor-name"
+                    value={newCompetitorName}
+                    onChange={(e) => setNewCompetitorName(e.target.value)}
+                    placeholder="e.g., Revolut"
+                    disabled={isUploading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="competitor-file">Screenshot</Label>
+                  <Input key={fileInputKey} id="competitor-file" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" disabled={isUploading} />
+                </div>
+                <Button onClick={handleAddCompetitor} disabled={isUploading}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="competitor-file">Screenshot</Label>
-                <Input key={fileInputKey} id="competitor-file" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" disabled={isUploading} />
-              </div>
-              <Button onClick={handleAddCompetitor} disabled={isUploading}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add
-              </Button>
             </div>
-          </div>
 
-          <div>
-            <h3 className="text-lg font-medium mb-4">Current Competitors</h3>
-            <div className="space-y-3">
-              {isLoading ? (
-                [...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
-              ) : competitors.length > 0 ? (
-                competitors.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      {c.imageUrl ? (
-                        <img src={c.imageUrl} alt={c.name} className="h-10 w-10 object-contain rounded-md bg-muted" />
-                      ) : (
-                        <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-md">
-                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      )}
-                      <span className="font-medium">{c.name}</span>
+            <div>
+              <h3 className="text-lg font-medium mb-4">Current Competitors</h3>
+              <div className="space-y-3">
+                {isLoading ? (
+                  [...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
+                ) : competitors.length > 0 ? (
+                  competitors.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        {c.imageUrl ? (
+                          <img src={c.imageUrl} alt={c.name} className="h-10 w-10 object-contain rounded-md bg-muted" />
+                        ) : (
+                          <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-md">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="font-medium">{c.name}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCompetitor(c)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCompetitor(c)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No competitors added yet.</p>
-              )}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No competitors added yet.</p>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   );
 };

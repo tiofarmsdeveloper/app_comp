@@ -28,7 +28,8 @@ import {
   dismissToast,
 } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Settings, History, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { Loader2, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { Header } from "@/components/Header";
 
 type AnalysisMode = "auto" | "screenshot" | "saved";
 
@@ -278,8 +279,9 @@ const Index = () => {
 
   if (userAnalysis) {
     return (
-      <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
-        <div className="w-full max-w-3xl">
+      <div className="min-h-screen flex flex-col items-center bg-background text-foreground">
+        <Header />
+        <main className="w-full max-w-3xl p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Analysis Results</h2>
             <Button variant="outline" onClick={handleClearAll}>
@@ -307,76 +309,75 @@ const Index = () => {
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 pt-20 sm:pt-4">
-      <div className="absolute top-4 right-16 flex items-center gap-2">
-        <Button variant="ghost" size="icon" asChild><Link to="/history"><History className="h-5 w-5" /></Link></Button>
-        <Button variant="ghost" size="icon" asChild><Link to="/settings"><Settings className="h-5 w-5" /></Link></Button>
-      </div>
-      <div className="w-full max-w-2xl text-center">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-tight">Sinder Competitor Analysis Tool</h1>
-        <p className="text-lg text-muted-foreground mb-8">Upload a screenshot of your app to get started.</p>
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <Header />
+      <main className="flex-grow flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-2xl text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-tight">Sinder Competitor Analysis Tool</h1>
+          <p className="text-lg text-muted-foreground mb-8">Upload a screenshot of your app to get started.</p>
 
-        <div className="flex flex-col items-center gap-8">
-          <div className="w-full max-w-lg space-y-3 text-left">
-            <Label className="text-base font-semibold">1. Upload Your App Screenshot (Sinder)</Label>
-            <FileUpload onFileChange={handleFileChange} id="sinder-upload" />
-          </div>
-
-          <div className="w-full max-w-lg space-y-3 text-left">
-            <Label htmlFor="analysis-mode" className="text-base font-semibold">2. Choose Analysis Mode</Label>
-            <Select value={analysisMode} onValueChange={(v) => setAnalysisMode(v as AnalysisMode)}>
-              <SelectTrigger id="analysis-mode">
-                <SelectValue placeholder="Select analysis mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Compare vs. Top 3 (Auto)</SelectItem>
-                <SelectItem value="screenshot">Compare vs. Screenshots</SelectItem>
-                <SelectItem value="saved">Compare vs. My Saved List</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {analysisMode === 'screenshot' && (
+          <div className="flex flex-col items-center gap-8">
             <div className="w-full max-w-lg space-y-3 text-left">
-              <Label className="text-base font-semibold">3. Upload Competitor Screenshots</Label>
-              <MultiFileUpload onFilesChange={handleCompetitorFilesChange} id="competitor-upload" />
+              <Label className="text-base font-semibold">1. Upload Your App Screenshot (Sinder)</Label>
+              <FileUpload onFileChange={handleFileChange} id="sinder-upload" />
             </div>
-          )}
-          {analysisMode === 'saved' && (
-            <div className="w-full max-w-lg p-4 border rounded-lg bg-muted/50 text-left">
-              <h3 className="text-base font-semibold mb-3">3. Comparing Against Your Saved List</h3>
-              <div className="space-y-2">
-                {isFetchingCompetitors ? (
-                  [...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
-                ) : savedCompetitors.length > 0 ? (
-                  savedCompetitors.map(c => (
-                    <div key={c.id} className="flex items-center gap-3 p-2 bg-background rounded-md">
-                      <img src={c.imageUrl} alt={c.name} className="h-8 w-8 object-contain rounded-sm bg-white" />
-                      <span className="text-sm font-medium">{c.name}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-2">No competitors found. <Link to="/settings/competitors" className="underline">Add some in settings.</Link></p>
-                )}
+
+            <div className="w-full max-w-lg space-y-3 text-left">
+              <Label htmlFor="analysis-mode" className="text-base font-semibold">2. Choose Analysis Mode</Label>
+              <Select value={analysisMode} onValueChange={(v) => setAnalysisMode(v as AnalysisMode)}>
+                <SelectTrigger id="analysis-mode">
+                  <SelectValue placeholder="Select analysis mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Compare vs. Top 3 (Auto)</SelectItem>
+                  <SelectItem value="screenshot">Compare vs. Screenshots</SelectItem>
+                  <SelectItem value="saved">Compare vs. My Saved List</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {analysisMode === 'screenshot' && (
+              <div className="w-full max-w-lg space-y-3 text-left">
+                <Label className="text-base font-semibold">3. Upload Competitor Screenshots</Label>
+                <MultiFileUpload onFilesChange={handleCompetitorFilesChange} id="competitor-upload" />
               </div>
+            )}
+            {analysisMode === 'saved' && (
+              <div className="w-full max-w-lg p-4 border rounded-lg bg-muted/50 text-left">
+                <h3 className="text-base font-semibold mb-3">3. Comparing Against Your Saved List</h3>
+                <div className="space-y-2">
+                  {isFetchingCompetitors ? (
+                    [...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+                  ) : savedCompetitors.length > 0 ? (
+                    savedCompetitors.map(c => (
+                      <div key={c.id} className="flex items-center gap-3 p-2 bg-background rounded-md">
+                        <img src={c.imageUrl} alt={c.name} className="h-8 w-8 object-contain rounded-sm bg-white" />
+                        <span className="text-sm font-medium">{c.name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-2">No competitors found. <Link to="/settings/competitors" className="underline">Add some in settings.</Link></p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="w-full max-w-lg">
+              <Button size="lg" onClick={handleStartAnalysis} disabled={!uploadedFile || isLoading} className="w-full">
+                {isLoading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {loadingMessage || "Analyzing..."}</>
+                ) : "Start Analysis"}
+              </Button>
             </div>
-          )}
-          
-          <div className="w-full max-w-lg">
-            <Button size="lg" onClick={handleStartAnalysis} disabled={!uploadedFile || isLoading} className="w-full">
-              {isLoading ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {loadingMessage || "Analyzing..."}</>
-              ) : "Start Analysis"}
-            </Button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
