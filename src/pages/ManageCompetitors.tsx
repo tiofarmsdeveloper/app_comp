@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ const ManageCompetitors = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [newCompetitorName, setNewCompetitorName] = useState("");
   const [newCompetitorFile, setNewCompetitorFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileInputKey, setFileInputKey] = useState(Date.now());
 
   const fetchCompetitors = async () => {
     setIsLoading(true);
@@ -94,9 +94,7 @@ const ManageCompetitors = () => {
       showSuccess("Competitor added successfully!");
       setNewCompetitorName("");
       setNewCompetitorFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setFileInputKey(Date.now()); // Reset the file input
       
       fetchCompetitors(); // Refresh the list
     } catch (err) {
@@ -168,7 +166,7 @@ const ManageCompetitors = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="competitor-file">Screenshot</Label>
-                <Input ref={fileInputRef} id="competitor-file" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" disabled={isUploading} />
+                <Input key={fileInputKey} id="competitor-file" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" disabled={isUploading} />
               </div>
               <Button onClick={handleAddCompetitor} disabled={isUploading}>
                 <PlusCircle className="mr-2 h-4 w-4" />
