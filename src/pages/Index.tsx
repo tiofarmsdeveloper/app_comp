@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,11 @@ import { AnalysisResult } from "@/components/AnalysisResult";
 import { ComparisonResult } from "@/components/ComparisonResult";
 import { Loader2, Settings, History } from "lucide-react";
 
-const competitors = [
-  { name: "Revolut", path: "/competitors/revolut.png" },
-  { name: "Wise", path: "/competitors/wise.png" },
-  { name: "N26", path: "/competitors/n26.png" },
-  { name: "Monzo", path: "/competitors/monzo.png" },
-  { name: "Curve", path: "/competitors/curve.png" },
-];
+interface Competitor {
+  id: string;
+  name: string;
+  primary_screenshot_path: string | null;
+}
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -29,6 +27,24 @@ const Index = () => {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
   const [comparisonResult, setComparisonResult] = useState<string | null>(null);
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+
+  useEffect(() => {
+    const fetchCompetitors = async () => {
+      const { data, error } = await supabase
+        .from("competitors")
+        .select("id, name, primary_screenshot_path")
+        .not("primary_screenshot_path", "is", null);
+
+      if (error) {
+        showError("Could not load competitors. Please try again later.");
+        console.error("Error fetching competitors:", error);
+      } else {
+        setCompetitors(data || []);
+      }
+    };
+    fetchCompetitors();
+  }, []);
 
   const handleFileChange = (file: File | null) => {
     setUploadedFile(file);
@@ -38,7 +54,22 @@ const Index = () => {
     }
   };
 
-  const analyzeImage = async (file: File): Promise<string> => {
+  const analyzeImage = async (
+    imageSource: File | string,
+    isPath = false,
+  ): Promise<string> => {
+    let file: File;
+    if (isPath) {
+      const { data: blob, error } = await supabase.storage
+        .from("competitor_screenshots")
+        .download(imageSource as string);
+      if (error) throw new Error(`Failed to download screenshot: ${error.message}`);
+      const fileName = (imageSource as string).split("/").pop()!;
+      file = new File([blob], fileName, { type: blob.type });
+    } else {
+      file = imageSource as File;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -46,10 +77,8 @@ const Index = () => {
       body: formData,
     });
 
-    if (error)
-      throw new Error(`Analysis failed for ${file.name}: ${error.message}`);
-    if (data.error)
-      throw new Error(`Analysis failed for ${file.name}: ${data.error}`);
+    if (error) throw new Error(`Analysis failed: ${error.message}`);
+    if (data.error) throw new Error(`Analysis failed: ${data.error}`);
 
     return data.analysis;
   };
@@ -59,25 +88,24 @@ const Index = () => {
       showError("Please upload a screenshot first.");
       return;
     }
+    if (competitors.length === 0) {
+      showError(
+        "No competitors found. Please add competitors in the settings.",
+      );
+      return;
+    }
 
     setIsLoading(true);
     const toastId = showLoading("Starting analysis...");
 
     try {
-      // Step 1: Analyze user and competitor images
       setLoadingMessage(`Analyzing your screenshot...`);
       const userAnalysisPromise = analyzeImage(uploadedFile);
 
-      setLoadingMessage(`Analyzing competitors...`);
-      const competitorPromises = competitors.map(async (competitor) => {
-        const response = await fetch(competitor.path);
-        if (!response.ok)
-          throw new Error(`Failed to fetch ${competitor.name} screenshot.`);
-        const blob = await response.blob();
-        const fileName = competitor.path.split("/").pop()!;
-        const file = new File([blob], fileName, { type: blob.type });
-        return analyzeImage(file);
-      });
+      setLoadingMessage(`Analyzing ${competitors.length} competitors...`);
+      const competitorPromises = competitors.map((competitor) =>
+        analyzeImage(competitor.primary_screenshot_path!, true),
+      );
 
       const [userResult, ...competitorResults] = await Promise.all([
         userAnalysisPromise,
@@ -86,8 +114,7 @@ const Index = () => {
 
       setUserAnalysis(userResult);
       showSuccess("Initial analyses complete. Now comparing...");
-      
-      // Step 2: Get comparison
+
       setLoadingMessage("Comparing against competitors...");
       const { data: comparisonData, error: comparisonError } =
         await supabase.functions.invoke("compare-analyses", {
@@ -104,17 +131,16 @@ const Index = () => {
       if (comparisonData.error) throw new Error(comparisonData.error);
       const comparison = comparisonData.comparison;
       setComparisonResult(comparison);
-      
-      // Step 3: Generate title
+
       setLoadingMessage("Generating title...");
-      const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", {
-        body: { analysis: userResult },
-      });
+      const { data: titleData, error: titleError } =
+        await supabase.functions.invoke("generate-title", {
+          body: { analysis: userResult },
+        });
       if (titleError) throw new Error(titleError.message);
       if (titleData.error) throw new Error(titleData.error);
       const title = titleData.title;
 
-      // Step 4: Save to history
       setLoadingMessage("Saving to history...");
       const { error: insertError } = await supabase
         .from("analysis_history")
@@ -184,7 +210,7 @@ const Index = () => {
           <Button
             size="lg"
             onClick={handleAnalyze}
-            disabled={!uploadedFile || isLoading}
+            disabled={!uploadedFile || isLoading || competitors.length === 0}
             className="w-full max-w-lg"
           >
             {isLoading ? (
