@@ -71,31 +71,34 @@ ${userAnalysisText}`;
     const competitorsJSON = JSON.parse(competitorsText);
     const competitorNames = competitorsJSON.competitors;
 
-    // Step 3: Generate a comparison based on knowledge, not images, to prevent hallucination
+    // Step 3: Generate a comparison based on knowledge, not images
     const comparisonPrompt = `
-You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable.
-You have deep knowledge of the competitive landscape and common user feedback from app store reviews.
+You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable. You specialize in screen-by-screen analysis.
 
 Here is a brief description of the user's app, Sinder:
 --- SINDER DESCRIPTION ---
 ${sinderDescription}
 ---
 
-An analysis of a user-submitted fintech app screenshot is provided below:
---- USER APP ANALYSIS ---
+An analysis of a user-submitted fintech app screenshot is provided below. This represents a single screen in their user flow.
+--- USER APP ANALYSIS (SINGLE SCREEN) ---
 ${userAnalysisText}
 
 Based on that analysis, its top 3 market competitors have been identified as: ${competitorNames.join(', ')}.
 
 --- YOUR TASK ---
-**Without searching for or describing specific competitor screenshots**, use your extensive knowledge of these competitor apps and common fintech UX patterns to perform a comparative analysis. Compare the user's app (based on its analysis) against the known features, strengths, and weaknesses of its competitors.
+Your analysis MUST be strictly confined to the features and UI elements visible in the provided screenshot analysis.
 
-If you do not have specific knowledge about a feature for a competitor, you MUST explicitly state that, for example: "While detailed information on [Competitor]'s exact onboarding flow isn't available, successful apps in this space typically..." This transparency is crucial.
+1.  **Acknowledge the Context:** Start by identifying the likely purpose of the screen (e.g., "This appears to be a dashboard screen...").
+2.  **Screen-Specific Comparison:** Use your extensive knowledge of the competitor apps to compare the user's screen against what you know about their *equivalent screens*. For example, if the user's screenshot is a transaction history, compare it to the typical transaction history screens of the competitors.
+3.  **State Your Assumptions Clearly:** If you don't have specific, up-to-date knowledge about a competitor's equivalent screen, you MUST state that. For example: "While Revolut's current dashboard may have changed, it typically excels at..." This transparency is crucial.
+4.  **Avoid Unfair Criticisms:** **Do not** criticize the user's app for lacking features that are not visible or wouldn't belong on this specific screen. This is a critical instruction.
+5.  **Actionable Recommendations:** Provide 5 concrete, actionable recommendations to improve *this specific screen* or the immediate user flow it implies. Frame these as solutions to common user problems seen on similar screens in app store reviews.
 
-Structure your response into three sections using markdown for formatting:
-1.  **Key Strengths vs. Market Leaders:** Identify 2-3 clear advantages the user's app appears to have.
-2.  **Critical Gaps vs. Market Leaders:** Identify 2-3 key areas where the identified competitors are generally better.
-3.  **5 Actionable Recommendations (From User Reviews):** Provide five concrete recommendations to gain a competitive edge. Frame these as solutions to common user problems seen in app store reviews for similar apps. Each recommendation must be clear and actionable.
+Structure your response into three sections using markdown:
+1.  **Key Strengths (On This Screen):** Based on the analysis, identify 2-3 clear advantages the user's screen has over typical competitor designs for this screen type.
+2.  **Critical Gaps (On This Screen):** Identify 2-3 key areas where the identified competitors generally offer a better experience on this type of screen.
+3.  **5 Actionable Recommendations (For This Screen):** Provide five concrete recommendations.
 
 Format the output as clean, structured markdown. Do not include a preamble or introduction.
 `;

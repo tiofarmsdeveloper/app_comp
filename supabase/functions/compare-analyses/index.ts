@@ -53,29 +53,32 @@ ${comp.analysis}
     const competitorNames = competitorAnalyses.map(c => c.name).join(', ');
 
     const prompt = `
-You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable.
-You have deep knowledge of the competitive landscape and common user feedback from app store reviews.
+You are a world-class UX and product strategy expert for fintech mobile apps. Your advice is sharp, insightful, and highly actionable. You specialize in screen-by-screen analysis.
 
 Here is a brief description of the user's app, Sinder:
 --- SINDER DESCRIPTION ---
 ${sinderDescription}
 ---
 
-First, here is an analysis of a user-submitted fintech app screenshot (Sinder):
---- USER APP ANALYSIS ---
+First, here is an analysis of a user-submitted fintech app screenshot (Sinder). This represents a single screen in their user flow.
+--- USER APP ANALYSIS (SINGLE SCREEN) ---
 ${userAnalysis}
 
-Now, here are the analyses of several competitor apps:
+Now, here are the analyses of single screenshots from several competitor apps, likely showing their equivalent screens.
 ${competitorAnalysesText}
 
 --- YOUR TASK ---
-Based on all the provided analyses, compare the user's app against the competitors (${competitorNames}).
-In your recommendations, incorporate insights as if you have analyzed thousands of app store reviews. For example, mention common user complaints (like hidden fees, poor customer service, confusing navigation) and praises (clear transaction history, easy budgeting tools, responsive support).
+Your analysis MUST be strictly confined to the features and UI elements visible in the provided screenshot analyses.
 
-Structure your response into three sections using markdown for formatting:
-1.  **Key Strengths vs. Competitors:** Identify 2-3 clear advantages the user's app has. Be specific.
-2.  **Critical Competitive Gaps:** Identify 2-3 key areas where competitors are significantly better. Refer to specific competitors by name.
-3.  **5 Actionable Recommendations (From User Reviews):** Provide five concrete recommendations to gain a competitive edge. Frame these as solutions to common user problems seen in reviews. Each recommendation must be clear and actionable.
+1.  **Acknowledge the Context:** Start by identifying the likely purpose of the screen (e.g., "This appears to be a dashboard screen...").
+2.  **Screen-Specific Comparison:** Compare the user's app screen *only* against the equivalent competitor screens. Focus on layout, information hierarchy, calls-to-action, and visible features.
+3.  **Avoid Assumptions:** **Do not** criticize the user's app for lacking features that are not visible or wouldn't belong on this specific screen. For example, if it's a home screen, do not mention a lack of login security features. This is a critical instruction.
+4.  **Actionable Recommendations:** Provide 5 concrete, actionable recommendations to improve *this specific screen* or the immediate user flow it implies. Frame these as solutions to common user problems seen on similar screens in app store reviews.
+
+Structure your response into three sections using markdown:
+1.  **Key Strengths (On This Screen):** Identify 2-3 clear advantages the user's screen has over the competitors' equivalent screens.
+2.  **Critical Gaps (On This Screen):** Identify 2-3 key areas where the competitors' screens are significantly better.
+3.  **5 Actionable Recommendations (For This Screen):** Provide five concrete recommendations.
 
 Format the output as clean, structured markdown. Do not include a preamble or introduction.
 `;
