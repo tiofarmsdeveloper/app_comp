@@ -2,11 +2,24 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.15.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function urlToGenerativePart(url: string, mimeType: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from URL: ${url}. Status: ${response.status}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const base64Encoded = encode(new Uint8Array(arrayBuffer));
+  return {
+    inlineData: { data: base64Encoded, mimeType },
+  };
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,9 +49,8 @@ serve(async (req) => {
 
     const { data: screenshots, error: screenshotsError } = await supabase
       .from('competitor_screenshots')
-      .select('ai_title')
-      .eq('competitor_id', competitor_id)
-      .not('ai_title', 'is', null);
+      .select('image_path')
+      .eq('competitor_id', competitor_id);
     if (screenshotsError) throw screenshotsError;
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -49,37 +61,49 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `
-You are a senior business and product strategist specializing in the fintech industry.
-I will provide you with information we have on a competitor called "${competitor.name}".
-Your task is to synthesize all of this information with your extensive knowledge base to generate a comprehensive and up-to-date analysis of this company.
+    // Step 1: Get base analysis from text-only data
+    const textPrompt = `
+      You are a senior business and product strategist specializing in the fintech industry.
+      Analyze the following fintech company based ONLY on the text information provided.
+      
+      --- PROVIDED TEXT INFORMATION ---
+      Name: ${competitor.name}
+      Short Description: ${competitor.short_description || 'Not provided.'}
+      Long Description: ${competitor.long_description || 'Not provided.'}
+      YouTube Videos: ${(competitor.youtube_videos && competitor.youtube_videos.length > 0) ? competitor.youtube_videos.map((url: string) => `- ${url}`).join('\n') : 'None provided.'}
 
---- PROVIDED INFORMATION ---
+      --- YOUR ANALYSIS TASK ---
+      Provide a baseline analysis covering: Key Features, Unique Selling Propositions, Target Audience, Strengths, and Weaknesses.
+      Format your response as structured markdown. This is the first step; we will add visual analysis later.
+    `;
+    const textResult = await model.generateContent(textPrompt);
+    let augmentedAnalysis = (await textResult.response).text();
 
-Short Description: ${competitor.short_description || 'Not provided.'}
+    // Step 2: Iteratively update the analysis with each screenshot
+    if (screenshots && screenshots.length > 0) {
+      for (const screenshot of screenshots) {
+        const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(screenshot.image_path);
+        const imagePart = await urlToGenerativePart(publicUrl, 'image/png');
 
-Long Description: ${competitor.long_description || 'Not provided.'}
+        const imagePrompt = `
+          You are a fintech product strategist. You have an existing analysis of a company. Now, you are receiving a new screenshot from their app.
+          Your task is to augment and refine the existing analysis with new insights from this screenshot.
+          Do not repeat information already present. Focus on adding new details about UI/UX, features, or user flows revealed in the image.
+          Output the complete, updated analysis in structured markdown.
 
-YouTube Videos:
-${(competitor.youtube_videos && competitor.youtube_videos.length > 0) ? competitor.youtube_videos.map((url: string) => `- ${url}`).join('\n') : 'None provided.'}
+          --- EXISTING ANALYSIS ---
+          ${augmentedAnalysis}
 
-Key App Screens (from analyzed screenshots):
-${(screenshots && screenshots.length > 0) ? screenshots.map(s => `- ${s.ai_title}`).join('\n') : 'None provided.'}
+          --- NEW SCREENSHOT TO ANALYZE ---
+          (see attached image)
 
---- YOUR ANALYSIS TASK ---
-
-Based on all the provided materials and your broader knowledge, provide a detailed analysis covering the following points:
-- Key Features and Product Offerings
-- Unique Selling Propositions (What makes them stand out?)
-- Target Audience
-- Potential Strengths and Weaknesses
-
-Format your response as a structured markdown text. This will be used as the input for a final comparison report.
-`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const augmentedAnalysis = response.text();
+          --- YOUR TASK ---
+          Return the fully updated and integrated analysis.
+        `;
+        const imageResult = await model.generateContent([imagePrompt, imagePart]);
+        augmentedAnalysis = (await imageResult.response).text();
+      }
+    }
 
     return new Response(JSON.stringify({ analysis: augmentedAnalysis }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

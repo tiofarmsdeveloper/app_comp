@@ -27,9 +27,9 @@ serve(async (req) => {
   }
 
   try {
-    const { competitor_id, screenshot_ids } = await req.json();
-    if (!competitor_id || !screenshot_ids || screenshot_ids.length === 0) {
-      return new Response(JSON.stringify({ error: "competitor_id and at least one screenshot_id are required." }), {
+    const { screenshot_ids } = await req.json();
+    if (!screenshot_ids || !Array.isArray(screenshot_ids) || screenshot_ids.length === 0) {
+      return new Response(JSON.stringify({ error: "screenshot_ids must be a non-empty array." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -40,66 +40,42 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { data: screenshots, error: ssError } = await supabase
-      .from('competitor_screenshots')
-      .select('id, image_path')
-      .in('id', screenshot_ids);
-
-    if (ssError) throw ssError;
-    if (!screenshots || screenshots.length === 0) {
-      throw new Error("No matching screenshots found in the database.");
-    }
-
-    const imageParts = await Promise.all(
-      screenshots.map(ss => {
-        const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(ss.image_path);
-        return urlToGenerativePart(publicUrl, 'image/png');
-      })
-    );
-
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not set.");
       throw new Error("Server configuration error: Missing API key.");
     }
 
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
-    const prompt = `
-You are a UX Analyst. For each of the ${screenshots.length} fintech app screenshots provided, generate a concise, descriptive title (3-5 words) that identifies the main action or information shown. The order of titles must correspond to the order of the images provided.
-
-Provide the output in a single, valid JSON object with the following structure. Do not include any other text or markdown formatting.
-{
-  "screenshot_titles": ["title for image 1", "title for image 2", ...]
-}
-`;
-
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    const jsonText = response.text().replace(/```json|```/g, '').trim();
-    
-    let aiResult;
-    try {
-      aiResult = JSON.parse(jsonText);
-       if (!aiResult.screenshot_titles || aiResult.screenshot_titles.length !== screenshots.length) {
-        throw new Error("AI response is missing titles or has incorrect number of titles.");
-      }
-    } catch (e) {
-      console.error("Failed to parse JSON from AI response:", jsonText, e.message);
-      throw new Error("AI returned an invalid response format.");
-    }
-
-    const updatePromises = screenshots.map((ss, index) =>
-      supabase
+    for (const screenshot_id of screenshot_ids) {
+      const { data: screenshot, error: ssError } = await supabase
         .from('competitor_screenshots')
-        .update({ ai_title: aiResult.screenshot_titles[index] })
-        .eq('id', ss.id)
-    );
-    const results = await Promise.all(updatePromises);
-    const updateErrors = results.map(r => r.error).filter(Boolean);
-    if (updateErrors.length > 0) {
-      throw new Error(`Failed to update some screenshot titles: ${updateErrors.map(e => e.message).join(', ')}`);
+        .select('id, image_path')
+        .eq('id', screenshot_id)
+        .single();
+
+      if (ssError || !screenshot) {
+        console.error(`Could not find or fetch screenshot ${screenshot_id}:`, ssError?.message);
+        continue; // Skip to the next screenshot if this one fails
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(screenshot.image_path);
+      const imagePart = await urlToGenerativePart(publicUrl, 'image/png');
+
+      const prompt = `
+        You are a UX Analyst. For the provided fintech app screenshot, generate a concise, descriptive title (3-5 words) that identifies the main action or information shown.
+        Provide only the title as plain text, without quotes or any other formatting.
+      `;
+
+      const result = await model.generateContent([prompt, imagePart]);
+      const response = await result.response;
+      const title = response.text().trim().replace(/["']/g, "");
+
+      await supabase
+        .from('competitor_screenshots')
+        .update({ ai_title: title })
+        .eq('id', screenshot.id);
     }
 
     return new Response(JSON.stringify({ success: true }), {
