@@ -20,6 +20,8 @@ interface Competitor {
   imageUrl: string;
 }
 
+type AnalysisType = "custom" | "auto";
+
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +29,7 @@ const Index = () => {
   const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
   const [comparisonResult, setComparisonResult] = useState<string | null>(null);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [analysisType, setAnalysisType] = useState<AnalysisType | null>(null);
 
   useEffect(() => {
     const fetchCompetitors = async () => {
@@ -82,10 +85,10 @@ const Index = () => {
     }
 
     setIsLoading(true);
+    setAnalysisType("custom");
     const toastId = showLoading("Starting analysis...");
 
     try {
-      // Step 1: Analyze user and competitor images
       setLoadingMessage(`Analyzing your screenshot...`);
       const userAnalysisPromise = analyzeImage(uploadedFile, uploadedFile.name);
 
@@ -107,7 +110,6 @@ const Index = () => {
       setUserAnalysis(userResult);
       showSuccess("Initial analyses complete. Now comparing...");
       
-      // Step 2: Get comparison
       setLoadingMessage("Comparing against competitors...");
       const { data: comparisonData, error: comparisonError } =
         await supabase.functions.invoke("compare-analyses", {
@@ -125,27 +127,7 @@ const Index = () => {
       const comparison = comparisonData.comparison;
       setComparisonResult(comparison);
       
-      // Step 3: Generate title
-      setLoadingMessage("Generating title...");
-      const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", {
-        body: { analysis: userResult },
-      });
-      if (titleError) throw new Error(titleError.message);
-      if (titleData.error) throw new Error(titleData.error);
-      const title = titleData.title;
-
-      // Step 4: Save to history
-      setLoadingMessage("Saving to history...");
-      const { error: insertError } = await supabase
-        .from("analysis_history")
-        .insert({
-          title: title,
-          user_analysis: userResult,
-          comparison_result: comparison,
-        });
-      if (insertError) throw insertError;
-
-      showSuccess("Analysis complete and saved to history!");
+      await generateTitleAndSave(userResult, comparison);
     } catch (err) {
       console.error("Full analysis process failed:", err);
       showError(
@@ -154,10 +136,69 @@ const Index = () => {
     } finally {
       setIsLoading(false);
       setLoadingMessage("");
-      if (toastId) {
-        dismissToast(toastId);
-      }
+      setAnalysisType(null);
+      if (toastId) dismissToast(toastId);
     }
+  };
+
+  const handleAutoAnalyze = async () => {
+    if (!uploadedFile) {
+      showError("Please upload a screenshot first.");
+      return;
+    }
+
+    setIsLoading(true);
+    setAnalysisType("auto");
+    const toastId = showLoading("Starting automated analysis...");
+
+    try {
+      setLoadingMessage("Identifying app and top competitors...");
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+      const { data, error } = await supabase.functions.invoke("auto-compare-analysis", {
+        body: formData,
+      });
+
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
+
+      const { userAnalysis: userResult, comparison: comparisonText } = data;
+      setUserAnalysis(userResult);
+      setComparisonResult(comparisonText);
+      showSuccess("Automated comparison complete.");
+
+      await generateTitleAndSave(userResult, comparisonText);
+    } catch (err) {
+      console.error("Automated analysis failed:", err);
+      showError(err instanceof Error ? err.message : "An unknown error occurred.");
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+      setAnalysisType(null);
+      if (toastId) dismissToast(toastId);
+    }
+  };
+
+  const generateTitleAndSave = async (userResult: string, comparison: string) => {
+    setLoadingMessage("Generating title...");
+    const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", {
+      body: { analysis: userResult },
+    });
+    if (titleError) throw new Error(titleError.message);
+    if (titleData.error) throw new Error(titleData.error);
+    const title = titleData.title;
+
+    setLoadingMessage("Saving to history...");
+    const { error: insertError } = await supabase
+      .from("analysis_history")
+      .insert({
+        title: title,
+        user_analysis: userResult,
+        comparison_result: comparison,
+      });
+    if (insertError) throw insertError;
+
+    showSuccess("Analysis complete and saved to history!");
   };
 
   const handleClear = () => {
@@ -201,21 +242,37 @@ const Index = () => {
 
         <div className="flex flex-col items-center gap-6">
           <FileUpload onFileChange={handleFileChange} />
-          <Button
-            size="lg"
-            onClick={handleAnalyze}
-            disabled={!uploadedFile || isLoading}
-            className="w-full max-w-lg"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {loadingMessage || "Analyzing..."}
-              </>
-            ) : (
-              "Analyze Against Competitors"
-            )}
-          </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+            <Button
+              size="lg"
+              onClick={handleAnalyze}
+              disabled={!uploadedFile || isLoading}
+            >
+              {isLoading && analysisType === 'custom' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {loadingMessage || "Analyzing..."}
+                </>
+              ) : (
+                "Analyze Against My List"
+              )}
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={handleAutoAnalyze}
+              disabled={!uploadedFile || isLoading}
+            >
+              {isLoading && analysisType === 'auto' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {loadingMessage || "Analyzing..."}
+                </>
+              ) : (
+                "Analyze Against Top 3"
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
