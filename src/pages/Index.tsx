@@ -137,6 +137,7 @@ const Index = () => {
 
     setIsLoading(true);
     const toastId = showLoading("Starting analysis...");
+    const localComparisonResults: ComparisonData[] = [];
 
     try {
       setLoadingMessage(`Analyzing your screenshot...`);
@@ -174,7 +175,8 @@ const Index = () => {
           if (comparisonError) throw new Error(comparisonError.message);
           if (comparisonData.error) throw new Error(comparisonData.error);
 
-          setComparisonResults(prev => [...prev, comparisonData]);
+          localComparisonResults.push(comparisonData);
+          setComparisonResults([...localComparisonResults]);
         }
       } else {
         showSuccess("General analysis will be available in history.");
@@ -187,7 +189,7 @@ const Index = () => {
       const title = titleData.title;
 
       setLoadingMessage("Saving to history...");
-      const comparisonMarkdown = formatResultsForHistory(userResult, comparisonResults);
+      const comparisonMarkdown = formatResultsForHistory(userResult, localComparisonResults);
       await supabase.from("analysis_history").insert({
         title: title,
         user_analysis: userResult,
