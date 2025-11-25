@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea"; // Import Textarea
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   showSuccess,
@@ -35,7 +35,6 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 
 interface Screenshot {
   id: string;
@@ -72,7 +71,7 @@ const ManageCompetitors = () => {
     } else {
       const competitorsWithDetails = await Promise.all(
         competitorsData.map(async (c) => {
-          const { data: screenshotsData, error: ssError } = await supabase
+          const { data: screenshotsData } = await supabase
             .from("competitor_screenshots")
             .select("id, image_path, ai_title")
             .eq("competitor_id", c.id)
@@ -122,7 +121,6 @@ const ManageCompetitors = () => {
     if (!window.confirm("Are you sure you want to delete this competitor and all its data?")) return;
     const toastId = showLoading("Deleting competitor...");
     try {
-      // Storage deletion needs to happen first
       const { data: screenshots } = await supabase.from('competitor_screenshots').select('image_path').eq('competitor_id', competitorId);
       if (screenshots && screenshots.length > 0) {
         const paths = screenshots.map(s => s.image_path);
@@ -217,11 +215,9 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newVideoUrl, setNewVideoUrl] = useState("");
-  // Local state for editing descriptions
   const [shortDescription, setShortDescription] = useState(competitor.short_description || "");
   const [longDescription, setLongDescription] = useState(competitor.long_description || "");
 
-  // Update local state if competitor prop changes
   useEffect(() => {
     setShortDescription(competitor.short_description || "");
     setLongDescription(competitor.long_description || "");
@@ -239,7 +235,7 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
         .eq('id', competitor.id);
       if (error) throw error;
       showSuccess("Descriptions saved.");
-      onUpdate(); // Refresh the list to reflect changes
+      onUpdate();
     } catch (err) {
       showError(err instanceof Error ? err.message : "Failed to save descriptions.");
     } finally {
@@ -365,7 +361,6 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
         </Button>
       </div>
       <AccordionContent className="space-y-6 pt-4">
-        {/* Descriptions */}
         <div className="space-y-4">
           <div>
             <Label htmlFor={`short-desc-${competitor.id}`}>Short Description</Label>
@@ -391,7 +386,6 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
           </Button>
         </div>
 
-        {/* Videos */}
         <div className="space-y-4 p-4 border rounded-lg">
           <h4 className="font-medium">YouTube Videos</h4>
           <div className="space-y-2">
@@ -411,7 +405,6 @@ const CompetitorAccordionItem = ({ competitor, onDelete, onUpdate }: CompetitorA
           </div>
         </div>
 
-        {/* Screenshots */}
         <div className="space-y-4 p-4 border rounded-lg">
           <h4 className="font-medium">Screenshots</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

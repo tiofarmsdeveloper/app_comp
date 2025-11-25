@@ -24,19 +24,9 @@ import { AnalysisResult } from "@/components/AnalysisResult";
 import { SingleComparisonResult, ComparisonData } from "@/components/SingleComparisonResult";
 import { Loader2, Settings, History } from "lucide-react";
 
-interface Screenshot {
-  id: string;
-  image_path: string;
-}
-
 interface Competitor {
   id: string;
   name: string;
-  short_description: string | null;
-  long_description: string | null;
-  youtube_videos: string[] | null;
-  screenshots: Screenshot[];
-  imageUrl: string;
 }
 
 const Index = () => {
@@ -52,30 +42,12 @@ const Index = () => {
     const fetchCompetitors = async () => {
       const { data: competitorsData, error } = await supabase
         .from("competitors")
-        .select("id, name, short_description, long_description, youtube_videos");
+        .select("id, name");
 
       if (error) {
         console.error("Failed to fetch competitors for analysis", error);
       } else {
-        const competitorsWithDetails = await Promise.all(
-          (competitorsData || []).map(async (c) => {
-            const { data: screenshotsData } = await supabase
-              .from("competitor_screenshots")
-              .select("id, image_path")
-              .eq("competitor_id", c.id);
-            
-            const screenshots = screenshotsData || [];
-            
-            let imageUrl = "/placeholder.svg";
-            if (screenshots.length > 0) {
-              const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(screenshots[0].image_path);
-              imageUrl = publicUrl;
-            }
-            
-            return { ...c, screenshots, imageUrl };
-          })
-        );
-        setAllCompetitors(competitorsWithDetails);
+        setAllCompetitors(competitorsData || []);
       }
     };
     fetchCompetitors();
@@ -162,16 +134,9 @@ const Index = () => {
           setLoadingMessage(`Researching & comparing with ${competitor.name} (${i + 1}/${competitorsToAnalyze.length})...`);
           
           const { data: augmentData, error: augmentError } = await supabase.functions.invoke("augment-competitor-data", {
-            body: {
-              competitor_name: competitor.name,
-              competitor_data: {
-                short_description: competitor.short_description,
-                long_description: competitor.long_description,
-                youtube_videos: competitor.youtube_videos,
-                screenshots: competitor.screenshots.map(s => s.image_path)
-              }
-            }
+            body: { competitor_id: competitor.id }
           });
+
           if (augmentError) throw new Error(`Failed to research ${competitor.name}: ${augmentError.message}`);
           if (augmentData.error) throw new Error(`Failed to research ${competitor.name}: ${augmentData.error}`);
           
