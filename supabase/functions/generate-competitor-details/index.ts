@@ -21,6 +21,23 @@ async function urlToGenerativePart(url: string, mimeType: string) {
   };
 }
 
+function getMimeType(filePath: string): string {
+  const extension = filePath.split('.').pop()?.toLowerCase();
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'image/png'; // Default to PNG
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -61,7 +78,8 @@ serve(async (req) => {
       }
 
       const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(screenshot.image_path);
-      const imagePart = await urlToGenerativePart(publicUrl, 'image/png');
+      const mimeType = getMimeType(screenshot.image_path);
+      const imagePart = await urlToGenerativePart(publicUrl, mimeType);
 
       const prompt = `
         You are a UX Analyst. For the provided fintech app screenshot, generate a concise, descriptive title (3-5 words) that identifies the main action or information shown.
