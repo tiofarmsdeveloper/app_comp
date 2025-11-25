@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FileUpload } from "@/components/FileUpload";
+import { MultiFileUpload } from "@/components/MultiFileUpload";
 import { Button } from "@/components/ui/button";
 import {
   showError,
@@ -15,129 +16,109 @@ import { AnalysisResult } from "@/components/AnalysisResult";
 import { ComparisonResult } from "@/components/ComparisonResult";
 import { Loader2, Settings, History } from "lucide-react";
 
-interface Competitor {
-  name: string;
-  imageUrl: string;
-}
+type AnalysisType = "auto" | "screenshot";
 
-type AnalysisType = "custom" | "auto";
+interface Comparison {
+  title: string;
+  content: string;
+}
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [competitorFiles, setCompetitorFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [userAnalysis, setUserAnalysis] = useState<string | null>(null);
-  const [comparisonResult, setComparisonResult] = useState<string | null>(null);
-  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [comparisonResults, setComparisonResults] = useState<Comparison[] | null>(null);
   const [analysisType, setAnalysisType] = useState<AnalysisType | null>(null);
-
-  useEffect(() => {
-    const fetchCompetitors = async () => {
-      const { data, error } = await supabase
-        .from("competitors")
-        .select("name, image_path");
-
-      if (error) {
-        console.error("Failed to fetch competitors for analysis", error);
-      } else {
-        const competitorsWithUrls = data.map(c => {
-          const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(c.image_path);
-          return { name: c.name, imageUrl: publicUrl };
-        });
-        setCompetitors(competitorsWithUrls);
-      }
-    };
-    fetchCompetitors();
-  }, []);
 
   const handleFileChange = (file: File | null) => {
     setUploadedFile(file);
-    if (userAnalysis || comparisonResult) {
+    handleClearResults();
+  };
+
+  const handleCompetitorFilesChange = (files: File[]) => {
+    setCompetitorFiles(files);
+    handleClearResults();
+  };
+
+  const handleClearResults = () => {
+    if (userAnalysis || comparisonResults) {
       setUserAnalysis(null);
-      setComparisonResult(null);
+      setComparisonResults(null);
     }
   };
 
-  const analyzeImage = async (file: File, fileName: string): Promise<string> => {
+  const analyzeImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-
     const { data, error } = await supabase.functions.invoke("analyze-image", {
       body: formData,
     });
-
-    if (error)
-      throw new Error(`Analysis failed for ${fileName}: ${error.message}`);
-    if (data.error)
-      throw new Error(`Analysis failed for ${fileName}: ${data.error}`);
-
+    if (error) throw new Error(`Analysis failed for ${file.name}: ${error.message}`);
+    if (data.error) throw new Error(`Analysis failed for ${file.name}: ${data.error}`);
     return data.analysis;
   };
 
-  const handleAnalyze = async () => {
+  const handleCompareScreenshots = async () => {
     if (!uploadedFile) {
-      showError("Please upload a screenshot first.");
+      showError("Please upload your app's screenshot.");
       return;
     }
-    if (competitors.length === 0) {
-      showError("Please add at least one competitor in the settings before analyzing.");
+    if (competitorFiles.length === 0) {
+      showError("Please upload at least one competitor screenshot.");
       return;
     }
 
     setIsLoading(true);
-    setAnalysisType("custom");
+    setAnalysisType("screenshot");
     const toastId = showLoading("Starting analysis...");
 
     try {
-      setLoadingMessage(`Analyzing your screenshot...`);
-      const userAnalysisPromise = analyzeImage(uploadedFile, uploadedFile.name);
+      setLoadingMessage("Analyzing your screenshot...");
+      const userAnalysisResult = await analyzeImage(uploadedFile);
+      setUserAnalysis(userAnalysisResult);
 
-      setLoadingMessage(`Analyzing ${competitors.length} competitors...`);
-      const competitorPromises = competitors.map(async (competitor) => {
-        const response = await fetch(competitor.imageUrl);
-        if (!response.ok)
-          throw new Error(`Failed to fetch ${competitor.name} screenshot.`);
-        const blob = await response.blob();
-        const file = new File([blob], competitor.name, { type: blob.type });
-        return analyzeImage(file, competitor.name);
-      });
-
-      const [userResult, ...competitorResults] = await Promise.all([
-        userAnalysisPromise,
-        ...competitorPromises,
-      ]);
-
-      setUserAnalysis(userResult);
-      showSuccess("Initial analyses complete. Now comparing...");
-      
-      setLoadingMessage("Comparing against competitors...");
-      const { data: comparisonData, error: comparisonError } =
-        await supabase.functions.invoke("compare-analyses", {
-          body: {
-            userAnalysis: userResult,
-            competitorAnalyses: competitorResults.map((analysis, index) => ({
-              name: competitors[index].name,
-              analysis: analysis,
-            })),
-          },
-        });
-
-      if (comparisonError) throw new Error(comparisonError.message);
-      if (comparisonData.error) throw new Error(comparisonData.error);
-      const comparison = comparisonData.comparison;
-      setComparisonResult(comparison);
-      
-      await generateTitleAndSave(userResult, comparison);
-    } catch (err) {
-      console.error("Full analysis process failed:", err);
-      showError(
-        err instanceof Error ? err.message : "An unknown error occurred.",
+      setLoadingMessage(`Analyzing ${competitorFiles.length} competitor(s)...`);
+      const competitorAnalyses = await Promise.all(
+        competitorFiles.map(file => analyzeImage(file))
       );
+
+      setLoadingMessage("Generating comparisons...");
+      const comparisonPromises = competitorAnalyses.map((compAnalysis, index) =>
+        supabase.functions.invoke("compare-screenshots", {
+          body: {
+            userAnalysis: userAnalysisResult,
+            competitorAnalysis: compAnalysis,
+            competitorName: competitorFiles[index].name,
+          },
+        })
+      );
+      
+      const comparisonResponses = await Promise.all(comparisonPromises);
+      const results: Comparison[] = [];
+      for (let i = 0; i < comparisonResponses.length; i++) {
+        const { data, error } = comparisonResponses[i];
+        if (error) throw new Error(error.message);
+        if (data.error) throw new Error(data.error);
+        results.push({
+          title: `Comparison vs. ${competitorFiles[i].name}`,
+          content: data.comparison,
+        });
+      }
+      setComparisonResults(results);
+
+      const combinedComparison = results.map(r => `## ${r.title}\n\n${r.content}`).join("\n\n---\n\n");
+      await generateTitleAndSave(userAnalysisResult, combinedComparison);
+
+    } catch (err) {
+      console.error("Screenshot comparison failed:", err);
+      showError(err instanceof Error ? err.message : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
       setLoadingMessage("");
       setAnalysisType(null);
-      if (toastId) dismissToast(toastId);
+      dismissToast(toastId);
     }
   };
 
@@ -164,7 +145,7 @@ const Index = () => {
 
       const { userAnalysis: userResult, comparison: comparisonText } = data;
       setUserAnalysis(userResult);
-      setComparisonResult(comparisonText);
+      setComparisonResults([{ title: "Automated Competitive Comparison", content: comparisonText }]);
       showSuccess("Automated comparison complete.");
 
       await generateTitleAndSave(userResult, comparisonText);
@@ -175,24 +156,25 @@ const Index = () => {
       setIsLoading(false);
       setLoadingMessage("");
       setAnalysisType(null);
-      if (toastId) dismissToast(toastId);
+      dismissToast(toastId);
     }
   };
 
   const generateTitleAndSave = async (userResult: string, comparison: string) => {
-    setLoadingMessage("Generating title...");
+    setLoadingMessage("Generating title and saving...");
     const { data: titleData, error: titleError } = await supabase.functions.invoke("generate-title", {
       body: { analysis: userResult },
     });
-    if (titleError) throw new Error(titleError.message);
-    if (titleData.error) throw new Error(titleData.error);
-    const title = titleData.title;
-
-    setLoadingMessage("Saving to history...");
+    if (titleError || titleData.error) {
+      console.error("Failed to generate title:", titleError || titleData.error);
+      showError("Failed to generate a title for the history entry.");
+      return;
+    }
+    
     const { error: insertError } = await supabase
       .from("analysis_history")
       .insert({
-        title: title,
+        title: titleData.title,
         user_analysis: userResult,
         comparison_result: comparison,
       });
@@ -201,18 +183,21 @@ const Index = () => {
     showSuccess("Analysis complete and saved to history!");
   };
 
-  const handleClear = () => {
+  const handleClearAll = () => {
     setUploadedFile(null);
+    setCompetitorFiles([]);
     setUserAnalysis(null);
-    setComparisonResult(null);
+    setComparisonResults(null);
   };
 
   if (userAnalysis) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 py-12">
+      <div className="min-h-screen flex flex-col items-center bg-background text-foreground p-4 py-12">
         <div className="w-full max-w-2xl">
-          <AnalysisResult result={userAnalysis} onClear={handleClear} />
-          {comparisonResult && <ComparisonResult result={comparisonResult} />}
+          <AnalysisResult result={userAnalysis} onClear={handleClearAll} />
+          {comparisonResults?.map((comp, index) => (
+            <ComparisonResult key={index} title={comp.title} result={comp.content} />
+          ))}
         </div>
       </div>
     );
@@ -237,24 +222,26 @@ const Index = () => {
           Sinder Competitor Analysis Tool
         </h1>
         <p className="text-lg text-muted-foreground mb-8">
-          Upload a screenshot of a mobile app to get started.
+          Upload a screenshot of your app to get started.
         </p>
 
         <div className="flex flex-col items-center gap-6">
           <FileUpload onFileChange={handleFileChange} />
+          <MultiFileUpload onFilesChange={handleCompetitorFilesChange} />
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
             <Button
               size="lg"
-              onClick={handleAnalyze}
-              disabled={!uploadedFile || isLoading}
+              onClick={handleCompareScreenshots}
+              disabled={!uploadedFile || competitorFiles.length === 0 || isLoading}
             >
-              {isLoading && analysisType === 'custom' ? (
+              {isLoading && analysisType === 'screenshot' ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {loadingMessage || "Analyzing..."}
+                  {loadingMessage || "Comparing..."}
                 </>
               ) : (
-                "Analyze Against My List"
+                "Compare Screenshots"
               )}
             </Button>
             <Button
@@ -269,7 +256,7 @@ const Index = () => {
                   {loadingMessage || "Analyzing..."}
                 </>
               ) : (
-                "Analyze Against Top 3"
+                "Analyze vs. Top 3"
               )}
             </Button>
           </div>

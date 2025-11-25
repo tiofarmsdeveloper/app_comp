@@ -76,7 +76,10 @@ const HistoryDetail = () => {
               </CardContent>
             </Card>
             {analysis.comparison_result && (
-              <ComparisonResult result={analysis.comparison_result} />
+              <ComparisonResult
+                title="Competitive Comparison"
+                result={analysis.comparison_result}
+              />
             )}
           </>
         ) : (
