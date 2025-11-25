@@ -130,8 +130,6 @@ const Index = () => {
         const competitorsToAnalyze = allCompetitors.filter(c => selectedCompetitors.includes(c.id));
         
         for (let i = 0; i < competitorsToAnalyze.length; i++) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
           const competitor = competitorsToAnalyze[i];
           setLoadingMessage(`Researching & comparing with ${competitor.name} (${i + 1}/${competitorsToAnalyze.length})...`);
           
