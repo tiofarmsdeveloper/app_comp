@@ -28,7 +28,7 @@ import {
   dismissToast,
 } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { Loader2, RefreshCw, Users } from "lucide-react";
 import { Header } from "@/components/Header";
 import { useUpload } from "../contexts/UploadContext";
 
@@ -42,7 +42,6 @@ interface Comparison {
 interface SavedCompetitor {
   id: string;
   name: string;
-  imageUrl: string;
 }
 
 const Index = () => {
@@ -61,21 +60,13 @@ const Index = () => {
         setIsFetchingCompetitors(true);
         const { data, error } = await supabase
           .from("competitors")
-          .select("id, name, primary_screenshot_path");
+          .select("id, name");
 
         if (error) {
           showError("Failed to fetch saved competitors.");
           console.error(error);
         } else {
-          const competitorsWithUrls = data.map(c => {
-            let publicUrl = '';
-            if (c.primary_screenshot_path) {
-              const { data: { publicUrl: url } } = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path);
-              publicUrl = url;
-            }
-            return { id: c.id, name: c.name, imageUrl: publicUrl };
-          });
-          setSavedCompetitors(competitorsWithUrls);
+          setSavedCompetitors(data);
         }
         setIsFetchingCompetitors(false);
       };
@@ -190,8 +181,10 @@ const Index = () => {
     const toastId = showLoading("Starting analysis...");
     try {
       setLoadingMessage("Analyzing your screenshot...");
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
       const { data: userAnalysisData, error: userAnalysisError } = await supabase.functions.invoke("analyze-image", {
-        body: (() => { const fd = new FormData(); fd.append("file", uploadedFile); return fd; })(),
+        body: formData,
       });
       if (userAnalysisError) throw new Error(userAnalysisError.message);
       if (userAnalysisData.error) throw new Error(userAnalysisData.error);
@@ -200,28 +193,8 @@ const Index = () => {
 
       setLoadingMessage(`Analyzing ${savedCompetitors.length} saved competitor(s)...`);
       
-      const competitorsWithScreenshot = savedCompetitors.filter(c => c.imageUrl);
-      const competitorsWithoutScreenshot = savedCompetitors.filter(c => !c.imageUrl);
-
-      const analysesWithScreenshot = await Promise.all(
-        competitorsWithScreenshot.map(async (competitor) => {
-          const response = await fetch(competitor.imageUrl);
-          if (!response.ok) throw new Error(`Failed to fetch image for ${competitor.name}`);
-          const blob = await response.blob();
-          const file = new File([blob], competitor.name, { type: blob.type });
-          
-          const { data: analysisData, error: analysisError } = await supabase.functions.invoke("analyze-image", {
-            body: (() => { const fd = new FormData(); fd.append("file", file); return fd; })(),
-          });
-          if (analysisError) throw new Error(analysisError.message);
-          if (analysisData.error) throw new Error(analysisData.error);
-
-          return { name: competitor.name, analysis: analysisData.analysis };
-        })
-      );
-
-      const analysesWithoutScreenshot = await Promise.all(
-        competitorsWithoutScreenshot.map(async (competitor) => {
+      const competitorAnalyses = await Promise.all(
+        savedCompetitors.map(async (competitor) => {
           const { data: analysisData, error: analysisError } = await supabase.functions.invoke("generate-analysis-from-name", {
             body: { competitorName: competitor.name },
           });
@@ -231,8 +204,6 @@ const Index = () => {
           return { name: competitor.name, analysis: analysisData.analysis };
         })
       );
-
-      const competitorAnalyses = [...analysesWithScreenshot, ...analysesWithoutScreenshot];
 
       setLoadingMessage("Generating comparison...");
       const { data, error } = await supabase.functions.invoke("compare-analyses", {
@@ -379,13 +350,7 @@ const Index = () => {
                   ) : savedCompetitors.length > 0 ? (
                     savedCompetitors.map(c => (
                       <div key={c.id} className="flex items-center gap-3 p-2 bg-background rounded-md">
-                        {c.imageUrl ? (
-                          <img src={c.imageUrl} alt={c.name} className="h-8 w-8 object-contain rounded-sm bg-white" />
-                        ) : (
-                          <div className="h-8 w-8 flex items-center justify-center bg-muted rounded-sm flex-shrink-0">
-                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
+                        <Users className="h-5 w-5 text-muted-foreground" />
                         <span className="text-sm font-medium">{c.name}</span>
                       </div>
                     ))
