@@ -45,6 +45,7 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: modelName });
 
+    // This part explicitly labels each competitor's analysis with its name.
     const competitorAnalysesText = competitorAnalyses.map((comp) => `
 --- COMPETITOR: ${comp.name} ---
 ${comp.analysis}
