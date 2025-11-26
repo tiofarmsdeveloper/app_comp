@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, DragEvent, ChangeEvent, useRef } from "react";
-import { UploadCloud, File as FileIcon, X } from "lucide-react";
+import { useState, DragEvent, ChangeEvent, useRef, useEffect } from "react";
+import { UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,8 +12,20 @@ interface FileUploadProps {
 
 export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (selectedFile: File) => {
+    if (selectedFile && selectedFile.type.startsWith("image/")) {
+      setFile(selectedFile);
+      onFileChange(selectedFile);
+      const previewUrl = URL.createObjectURL(selectedFile);
+      setPreview(previewUrl);
+    } else {
+      console.error("Invalid file type. Please upload an image.");
+    }
+  };
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -36,34 +48,23 @@ export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const uploadedFile = files[0];
-      if (uploadedFile.type.startsWith("image/")) {
-        setFile(uploadedFile);
-        onFileChange(uploadedFile);
-      } else {
-        console.error("Invalid file type. Please upload an image.");
-      }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const uploadedFile = files[0];
-      if (uploadedFile.type.startsWith("image/")) {
-        setFile(uploadedFile);
-        onFileChange(uploadedFile);
-      } else {
-        console.error("Invalid file type. Please upload an image.");
-      }
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelect(e.target.files[0]);
     }
   };
 
   const handleRemoveFile = () => {
     setFile(null);
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+    setPreview(null);
     onFileChange(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -71,20 +72,30 @@ export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
   };
 
   const triggerFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    fileInputRef.current?.click();
   };
+
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   return (
     <div className="w-full">
-      {file ? (
-        <div className="relative flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+      {file && preview ? (
+        <div className="relative flex items-center justify-between p-3 border rounded-lg bg-muted/50">
           <div className="flex items-center gap-4">
-            <FileIcon className="h-8 w-8 text-gray-500" />
+            <img
+              src={preview}
+              alt="Preview"
+              className="h-16 w-16 object-contain rounded-md bg-white"
+            />
             <div className="text-left">
               <p className="font-medium text-sm">{file.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {(file.size / 1024).toFixed(2)} KB
               </p>
             </div>
@@ -92,10 +103,11 @@ export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 h-6 w-6"
+            className="absolute top-1 right-1 h-7 w-7"
             onClick={handleRemoveFile}
           >
             <X className="h-4 w-4" />
+            <span className="sr-only">Remove file</span>
           </Button>
         </div>
       ) : (
