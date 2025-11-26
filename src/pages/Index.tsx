@@ -30,6 +30,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { Header } from "@/components/Header";
+import { useUpload } from "../contexts/UploadContext";
 
 type AnalysisMode = "auto" | "screenshot" | "saved";
 
@@ -45,8 +46,7 @@ interface SavedCompetitor {
 }
 
 const Index = () => {
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [competitorFiles, setCompetitorFiles] = useState<File[]>([]);
+  const { uploadedFile, setUploadedFile, competitorFiles, setCompetitorFiles } = useUpload();
   const [savedCompetitors, setSavedCompetitors] = useState<SavedCompetitor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCompetitors, setIsFetchingCompetitors] = useState(false);
