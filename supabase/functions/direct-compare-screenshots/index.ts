@@ -29,6 +29,7 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
+    // 1. Fetching the settings from the database
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
       .select('key, value')
@@ -38,7 +39,7 @@ serve(async (req) => {
       throw new Error(`Failed to fetch settings: ${settingsError.message}`);
     }
 
-    const modelName = settings.find(s => s.key === 'gemini_model')?.value || 'gemini-1.5-flash';
+    // 2. Extracting your description (with a fallback just in case)
     const sinderDescription = settings.find(s => s.key === 'sinder_description')?.value || "The user's app.";
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -61,6 +62,7 @@ serve(async (req) => {
     const userImagePart = await fileToGenerativePart(userFile);
     const competitorImagePart = await fileToGenerativePart(competitorFile);
 
+    // 3. Injecting the description directly into the AI's instructions
     const prompt = `
 You are a world-class UX and product strategy expert specializing in screen-by-screen analysis of mobile apps.
 
