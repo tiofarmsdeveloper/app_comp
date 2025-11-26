@@ -25,7 +25,7 @@ import { Header } from "@/components/Header";
 interface Competitor {
   id: string;
   name: string;
-  image_path: string;
+  primary_screenshot_path: string | null;
   imageUrl?: string;
 }
 
@@ -41,7 +41,7 @@ const ManageCompetitors = () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("competitors")
-      .select("id, name, image_path")
+      .select("id, name, primary_screenshot_path")
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -50,7 +50,11 @@ const ManageCompetitors = () => {
       setCompetitors([]);
     } else {
       const competitorsWithUrls = data.map(c => {
-        const { data: { publicUrl } } = supabase.storage.from('competitor_images').getPublicUrl(c.image_path);
+        let publicUrl = '';
+        if (c.primary_screenshot_path) {
+          const result = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path);
+          publicUrl = result.data.publicUrl;
+        }
         return { ...c, imageUrl: publicUrl };
       });
       setCompetitors(competitorsWithUrls);
@@ -80,14 +84,14 @@ const ManageCompetitors = () => {
     try {
       const filePath = `public/${Date.now()}-${newCompetitorFile.name}`;
       const { error: uploadError } = await supabase.storage
-        .from("competitor_images")
+        .from("competitor_screenshots")
         .upload(filePath, newCompetitorFile);
 
       if (uploadError) throw uploadError;
 
       const { error: insertError } = await supabase
         .from("competitors")
-        .insert({ name: newCompetitorName, image_path: filePath });
+        .insert({ name: newCompetitorName, primary_screenshot_path: filePath });
 
       if (insertError) throw insertError;
 
@@ -116,11 +120,13 @@ const ManageCompetitors = () => {
       
       if (deleteError) throw deleteError;
 
-      const { error: storageError } = await supabase.storage
-        .from("competitor_images")
-        .remove([competitor.image_path]);
+      if (competitor.primary_screenshot_path) {
+        const { error: storageError } = await supabase.storage
+          .from("competitor_screenshots")
+          .remove([competitor.primary_screenshot_path]);
 
-      if (storageError) throw storageError;
+        if (storageError) throw storageError;
+      }
 
       showSuccess("Competitor deleted.");
       setCompetitors(competitors.filter(c => c.id !== competitor.id));

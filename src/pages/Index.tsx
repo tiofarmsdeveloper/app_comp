@@ -67,10 +67,12 @@ const Index = () => {
           showError("Failed to fetch saved competitors.");
           console.error(error);
         } else {
-          const competitorsWithUrls = data.map(c => {
-            const { data: { publicUrl } } = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path);
-            return { id: c.id, name: c.name, imageUrl: publicUrl };
-          });
+          const competitorsWithUrls = data
+            .filter(c => c.primary_screenshot_path)
+            .map(c => {
+              const { data: { publicUrl } } = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path!);
+              return { id: c.id, name: c.name, imageUrl: publicUrl };
+            });
           setSavedCompetitors(competitorsWithUrls);
         }
         setIsFetchingCompetitors(false);
