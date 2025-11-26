@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, DragEvent, ChangeEvent, useRef, useEffect } from "react";
-import { UploadCloud, X } from "lucide-react";
+import { UploadCloud, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface FileUploadProps {
@@ -14,14 +15,19 @@ export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile && selectedFile.type.startsWith("image/")) {
-      setFile(selectedFile);
-      onFileChange(selectedFile);
-      const previewUrl = URL.createObjectURL(selectedFile);
-      setPreview(previewUrl);
+      setIsProcessing(true);
+      setTimeout(() => {
+        setFile(selectedFile);
+        onFileChange(selectedFile);
+        const previewUrl = URL.createObjectURL(selectedFile);
+        setPreview(previewUrl);
+        setIsProcessing(false);
+      }, 500);
     } else {
       console.error("Invalid file type. Please upload an image.");
     }
@@ -85,7 +91,18 @@ export const FileUpload = ({ onFileChange, id }: FileUploadProps) => {
 
   return (
     <div className="w-full">
-      {file && preview ? (
+      {isProcessing ? (
+        <div className="relative flex items-center justify-between p-3 border rounded-lg bg-muted/50 h-[88px]">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-16 w-16 rounded-md" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-4 w-[100px]" />
+            </div>
+          </div>
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        </div>
+      ) : file && preview ? (
         <div className="relative flex items-center justify-between p-3 border rounded-lg bg-muted/50">
           <div className="flex items-center gap-4">
             <img

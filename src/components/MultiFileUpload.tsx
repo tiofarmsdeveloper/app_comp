@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, DragEvent, ChangeEvent, useRef, useEffect } from "react";
-import { UploadCloud, X } from "lucide-react";
+import { UploadCloud, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,18 +18,25 @@ interface MultiFileUploadProps {
 export const MultiFileUpload = ({ onFilesChange, className, id }: MultiFileUploadProps) => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFilesSelect = (selectedFiles: File[]) => {
     const imageFiles = selectedFiles.filter(file => file.type.startsWith("image/"));
-    const newFilesWithPreview = imageFiles.map(file =>
-      Object.assign(file, {
-        preview: URL.createObjectURL(file),
-      })
-    );
-    const updatedFiles = [...files, ...newFilesWithPreview];
-    setFiles(updatedFiles);
-    onFilesChange(updatedFiles);
+    if (imageFiles.length > 0) {
+      setIsProcessing(true);
+      setTimeout(() => {
+        const newFilesWithPreview = imageFiles.map(file =>
+          Object.assign(file, {
+            preview: URL.createObjectURL(file),
+          })
+        );
+        const updatedFiles = [...files, ...newFilesWithPreview];
+        setFiles(updatedFiles);
+        onFilesChange(updatedFiles);
+        setIsProcessing(false);
+      }, 500);
+    }
   };
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
@@ -105,13 +112,24 @@ export const MultiFileUpload = ({ onFilesChange, className, id }: MultiFileUploa
         onDrop={handleDrop}
         onClick={triggerFileInput}
       >
-        <UploadCloud className="w-10 h-10 text-gray-400 mb-3" />
-        <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
-          <span className="font-semibold">Upload competitor screenshots</span>
-        </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Drag & drop or click to select files
-        </p>
+        {isProcessing ? (
+          <>
+            <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+            <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+              Processing...
+            </p>
+          </>
+        ) : (
+          <>
+            <UploadCloud className="w-10 h-10 text-gray-400 mb-3" />
+            <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+              <span className="font-semibold">Upload competitor screenshots</span>
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Drag & drop or click to select files
+            </p>
+          </>
+        )}
         <input
           type="file"
           ref={fileInputRef}
