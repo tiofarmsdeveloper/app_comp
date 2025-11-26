@@ -73,8 +73,8 @@ const ManageCompetitors = () => {
   };
 
   const handleAddCompetitor = async () => {
-    if (!newCompetitorName || !newCompetitorFile) {
-      showError("Please provide a name and select a file.");
+    if (!newCompetitorName) {
+      showError("Please provide a competitor name.");
       return;
     }
 
@@ -82,12 +82,15 @@ const ManageCompetitors = () => {
     const toastId = showLoading("Adding competitor...");
 
     try {
-      const filePath = `public/${Date.now()}-${newCompetitorFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("competitor_screenshots")
-        .upload(filePath, newCompetitorFile);
+      let filePath = null;
+      if (newCompetitorFile) {
+        filePath = `public/${Date.now()}-${newCompetitorFile.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("competitor_screenshots")
+          .upload(filePath, newCompetitorFile);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
+      }
 
       const { error: insertError } = await supabase
         .from("competitors")
@@ -146,7 +149,7 @@ const ManageCompetitors = () => {
           <CardHeader>
             <CardTitle>Manage Competitors</CardTitle>
             <CardDescription>
-              Add or remove competitors for the analysis.
+              Add or remove competitors for the analysis. A screenshot is optional.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -164,7 +167,7 @@ const ManageCompetitors = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="competitor-file">Screenshot</Label>
+                  <Label htmlFor="competitor-file">Screenshot (Optional)</Label>
                   <Input key={fileInputKey} id="competitor-file" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" disabled={isUploading} />
                 </div>
                 <Button onClick={handleAddCompetitor} disabled={isUploading}>

@@ -67,12 +67,14 @@ const Index = () => {
           showError("Failed to fetch saved competitors.");
           console.error(error);
         } else {
-          const competitorsWithUrls = data
-            .filter(c => c.primary_screenshot_path)
-            .map(c => {
-              const { data: { publicUrl } } = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path!);
-              return { id: c.id, name: c.name, imageUrl: publicUrl };
-            });
+          const competitorsWithUrls = data.map(c => {
+            let publicUrl = '';
+            if (c.primary_screenshot_path) {
+              const { data: { publicUrl: url } } = supabase.storage.from('competitor_screenshots').getPublicUrl(c.primary_screenshot_path);
+              publicUrl = url;
+            }
+            return { id: c.id, name: c.name, imageUrl: publicUrl };
+          });
           setSavedCompetitors(competitorsWithUrls);
         }
         setIsFetchingCompetitors(false);
@@ -197,8 +199,12 @@ const Index = () => {
       setUserAnalysis(userAnalysisResult);
 
       setLoadingMessage(`Analyzing ${savedCompetitors.length} saved competitor(s)...`);
-      const competitorAnalyses = await Promise.all(
-        savedCompetitors.map(async (competitor) => {
+      
+      const competitorsWithScreenshot = savedCompetitors.filter(c => c.imageUrl);
+      const competitorsWithoutScreenshot = savedCompetitors.filter(c => !c.imageUrl);
+
+      const analysesWithScreenshot = await Promise.all(
+        competitorsWithScreenshot.map(async (competitor) => {
           const response = await fetch(competitor.imageUrl);
           if (!response.ok) throw new Error(`Failed to fetch image for ${competitor.name}`);
           const blob = await response.blob();
@@ -213,6 +219,20 @@ const Index = () => {
           return { name: competitor.name, analysis: analysisData.analysis };
         })
       );
+
+      const analysesWithoutScreenshot = await Promise.all(
+        competitorsWithoutScreenshot.map(async (competitor) => {
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke("generate-analysis-from-name", {
+            body: { competitorName: competitor.name },
+          });
+          if (analysisError) throw new Error(analysisError.message);
+          if (analysisData.error) throw new Error(analysisData.error);
+
+          return { name: competitor.name, analysis: analysisData.analysis };
+        })
+      );
+
+      const competitorAnalyses = [...analysesWithScreenshot, ...analysesWithoutScreenshot];
 
       setLoadingMessage("Generating comparison...");
       const { data, error } = await supabase.functions.invoke("compare-analyses", {
@@ -359,7 +379,13 @@ const Index = () => {
                   ) : savedCompetitors.length > 0 ? (
                     savedCompetitors.map(c => (
                       <div key={c.id} className="flex items-center gap-3 p-2 bg-background rounded-md">
-                        <img src={c.imageUrl} alt={c.name} className="h-8 w-8 object-contain rounded-sm bg-white" />
+                        {c.imageUrl ? (
+                          <img src={c.imageUrl} alt={c.name} className="h-8 w-8 object-contain rounded-sm bg-white" />
+                        ) : (
+                          <div className="h-8 w-8 flex items-center justify-center bg-muted rounded-sm flex-shrink-0">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
                         <span className="text-sm font-medium">{c.name}</span>
                       </div>
                     ))
